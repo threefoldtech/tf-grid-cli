@@ -10,6 +10,7 @@ import (
 	"github.com/threefoldtech/grid3-go/deployer"
 	"github.com/threefoldtech/grid3-go/workloads"
 	"github.com/threefoldtech/tf-grid-cli/internal/config"
+	"github.com/threefoldtech/tf-grid-cli/internal/filters"
 )
 
 var ubuntuFlist = "https://hub.grid.tf/tf-official-apps/threefoldtech-ubuntu-22.04.flist"
@@ -20,12 +21,10 @@ var deployVMCmd = &cobra.Command{
 	Use:   "vm",
 	Short: "Deploy a vm",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		vm := workloads.VM{}
 		name, err := cmd.Flags().GetString("name")
 		if err != nil {
 			return err
 		}
-		vm.Name = name
 		sshFile, err := cmd.Flags().GetString("ssh")
 		if err != nil {
 			return err
@@ -34,17 +33,22 @@ var deployVMCmd = &cobra.Command{
 		if err != nil {
 			log.Fatal().Err(err).Send()
 		}
-		vm.EnvVars = map[string]string{"SSH_KEY": string(sshKey)}
+		node, err := cmd.Flags().GetUint32("node")
+		if err != nil {
+			return err
+		}
+		farm, err := cmd.Flags().GetUint64("farm")
+		if err != nil {
+			return err
+		}
 		cpu, err := cmd.Flags().GetInt("cpu")
 		if err != nil {
 			return err
 		}
-		vm.CPU = cpu
 		memory, err := cmd.Flags().GetInt("memory")
 		if err != nil {
 			return err
 		}
-		vm.Memory = memory * 1024
 		rootfs, err := cmd.Flags().GetInt("rootfs")
 		if err != nil {
 			return err
@@ -53,32 +57,38 @@ var deployVMCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		vm.RootfsSize = rootfs * 1024
 		flist, err := cmd.Flags().GetString("flist")
 		if err != nil {
 			return err
 		}
-		vm.Flist = flist
 		entrypoint, err := cmd.Flags().GetString("entrypoint")
 		if err != nil {
 			return err
 		}
-		vm.Entrypoint = entrypoint
 		ipv4, err := cmd.Flags().GetBool("ipv4")
 		if err != nil {
 			return err
 		}
-		vm.PublicIP = ipv4
 		ipv6, err := cmd.Flags().GetBool("ipv6")
 		if err != nil {
 			return err
 		}
-		vm.PublicIP6 = ipv6
 		ygg, err := cmd.Flags().GetBool("ygg")
 		if err != nil {
 			return err
 		}
-		vm.Planetary = ygg
+		vm := workloads.VM{
+			Name:       name,
+			EnvVars:    map[string]string{"SSH_KEY": string(sshKey)},
+			CPU:        cpu,
+			Memory:     memory * 1024,
+			RootfsSize: rootfs * 1024,
+			Flist:      flist,
+			Entrypoint: entrypoint,
+			PublicIP:   ipv4,
+			PublicIP6:  ipv6,
+			Planetary:  ygg,
+		}
 		var mount workloads.Disk
 		if disk != 0 {
 			diskName := fmt.Sprintf("%sdisk", name)
@@ -93,7 +103,16 @@ var deployVMCmd = &cobra.Command{
 		if err != nil {
 			log.Fatal().Err(err).Send()
 		}
-		resVM, err := t.DeployVM(vm, mount)
+		if node == 0 {
+			node, err = filters.GetAvailableNode(
+				t.GridProxyClient,
+				filters.BuildVMFilter(vm, mount, farm),
+			)
+			if err != nil {
+				log.Fatal().Err(err).Send()
+			}
+		}
+		resVM, err := t.DeployVM(vm, mount, node)
 		if err != nil {
 			log.Fatal().Err(err).Send()
 		}
@@ -125,6 +144,11 @@ func init() {
 	if err != nil {
 		log.Fatal().Err(err).Send()
 	}
+
+	deployVMCmd.Flags().Uint32("node", 0, "node id vm should be deployed on")
+	deployVMCmd.Flags().Uint64("farm", 1, "farm id vm should be deployed on")
+	deployGatewayCmd.MarkFlagsMutuallyExclusive("node", "farm")
+
 	deployVMCmd.Flags().Int("cpu", 1, "number of cpu units")
 	deployVMCmd.Flags().Int("memory", 1, "memory size in gb")
 	deployVMCmd.Flags().Int("rootfs", 2, "root filesystem size in gb")
