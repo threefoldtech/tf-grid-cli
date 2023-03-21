@@ -46,8 +46,8 @@ var deployGatewayFQDNCmd = &cobra.Command{
 			if err != nil {
 				log.Fatal().Err(err).Send()
 			}
-			gateway.NodeID = node
 		}
+		gateway.NodeID = node
 		err = t.DeployGatewayFQDN(gateway)
 		if err != nil {
 			log.Fatal().Err(err).Send()

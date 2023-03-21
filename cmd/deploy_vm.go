@@ -147,7 +147,7 @@ func init() {
 
 	deployVMCmd.Flags().Uint32("node", 0, "node id vm should be deployed on")
 	deployVMCmd.Flags().Uint64("farm", 1, "farm id vm should be deployed on")
-	deployGatewayCmd.MarkFlagsMutuallyExclusive("node", "farm")
+	deployVMCmd.MarkFlagsMutuallyExclusive("node", "farm")
 
 	deployVMCmd.Flags().Int("cpu", 1, "number of cpu units")
 	deployVMCmd.Flags().Int("memory", 1, "memory size in gb")

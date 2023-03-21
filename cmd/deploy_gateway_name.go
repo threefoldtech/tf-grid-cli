@@ -41,8 +41,8 @@ var deployGatewayNameCmd = &cobra.Command{
 			if err != nil {
 				log.Fatal().Err(err).Send()
 			}
-			gateway.NodeID = node
 		}
+		gateway.NodeID = node
 		resGateway, err := t.DeployGatewayName(gateway)
 		if err != nil {
 			log.Fatal().Err(err).Send()
