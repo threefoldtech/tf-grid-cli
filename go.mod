@@ -1,6 +1,6 @@
 module github.com/threefoldtech/tf-grid-cli
 
-go 1.20
+go 1.19
 
 require (
 	github.com/cosmos/go-bip39 v1.0.0
