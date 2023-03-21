@@ -10,6 +10,7 @@ import (
 	"github.com/threefoldtech/grid3-go/deployer"
 	"github.com/threefoldtech/grid3-go/workloads"
 	"github.com/threefoldtech/tf-grid-cli/internal/config"
+	"github.com/threefoldtech/tf-grid-cli/internal/filters"
 )
 
 var k8sFlist = "https://hub.grid.tf/tf-official-apps/threefoldtech-k3s-latest.flist"
@@ -32,6 +33,10 @@ var deployKubernetesCmd = &cobra.Command{
 			log.Fatal().Err(err).Send()
 		}
 		masterNode, err := cmd.Flags().GetUint32("master-node")
+		if err != nil {
+			return err
+		}
+		masterFarm, err := cmd.Flags().GetUint64("master-farm")
 		if err != nil {
 			return err
 		}
@@ -61,7 +66,6 @@ var deployKubernetesCmd = &cobra.Command{
 		}
 		master := workloads.K8sNode{
 			Name:      name,
-			Node:      masterNode,
 			CPU:       masterCPU,
 			Memory:    masterMemory * 1024,
 			DiskSize:  masterDisk,
@@ -80,8 +84,9 @@ var deployKubernetesCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		if workersNode == 0 {
-			workersNode = masterNode
+		workersFarm, err := cmd.Flags().GetUint64("workers-farm")
+		if err != nil {
+			return err
 		}
 		workersCPU, err := cmd.Flags().GetInt("workers-cpu")
 		if err != nil {
@@ -100,7 +105,6 @@ var deployKubernetesCmd = &cobra.Command{
 			workerName := fmt.Sprintf("worker%d", i)
 			worker := workloads.K8sNode{
 				Name:     workerName,
-				Node:     workersNode,
 				Flist:    k8sFlist,
 				CPU:      workersCPU,
 				Memory:   workersMemory * 1024,
@@ -116,6 +120,38 @@ var deployKubernetesCmd = &cobra.Command{
 		t, err := deployer.NewTFPluginClient(cfg.Mnemonics, "sr25519", cfg.Network, "", "", "", true, false)
 		if err != nil {
 			log.Fatal().Err(err).Send()
+		}
+
+		if masterNode == 0 {
+			masterNode, err = filters.GetAvailableNode(
+				t.GridProxyClient,
+				filters.BuildK8sFilter(
+					master,
+					masterFarm,
+					1,
+				),
+			)
+			if err != nil {
+				log.Fatal().Err(err).Send()
+			}
+			master.Node = masterNode
+		}
+
+		if workersNode == 0 && len(workers) > 0 {
+			workersNode, err = filters.GetAvailableNode(
+				t.GridProxyClient,
+				filters.BuildK8sFilter(
+					workers[0],
+					workersFarm,
+					uint(len(workers)),
+				),
+			)
+			if err != nil {
+				log.Fatal().Err(err).Send()
+			}
+			for i := 0; i < workerNumber; i++ {
+				workers[i].Node = workersNode
+			}
 		}
 		cluster, err := t.DeployKubernetesCluster(master, workers, string(sshKey))
 		if err != nil {
@@ -150,17 +186,17 @@ func init() {
 	deployKubernetesCmd.Flags().Int("master-cpu", 1, "master number of cpu units")
 	deployKubernetesCmd.Flags().Int("master-memory", 1, "master memory size in gb")
 	deployKubernetesCmd.Flags().Int("master-disk", 2, "master disk size in gb")
-	deployKubernetesCmd.Flags().Uint32("master-node", 0, "master node id")
-	err = deployKubernetesCmd.MarkFlagRequired("master-node")
-	if err != nil {
-		log.Fatal().Err(err).Send()
-	}
+	deployKubernetesCmd.Flags().Uint32("master-node", 0, "node id master should be deployed on")
+	deployKubernetesCmd.Flags().Uint64("master-farm", 1, "farm id master should be deployed on")
+	deployKubernetesCmd.MarkFlagsMutuallyExclusive("master-node", "master-farm")
 
 	deployKubernetesCmd.Flags().Int("workers-number", 0, "number of workers")
 	deployKubernetesCmd.Flags().Int("workers-cpu", 1, "workers number of cpu units")
 	deployKubernetesCmd.Flags().Int("workers-memory", 1, "workers memory size in gb")
 	deployKubernetesCmd.Flags().Int("workers-disk", 2, "workers disk size in gb")
-	deployKubernetesCmd.Flags().Uint32("workers-node", 0, "workers node id")
+	deployKubernetesCmd.Flags().Uint32("workers-node", 0, "node id workers should be deployed on")
+	deployKubernetesCmd.Flags().Uint64("workers-farm", 1, "farm id workers should be deployed on")
+	deployKubernetesCmd.MarkFlagsMutuallyExclusive("workers-node", "workers-farm")
 
 	deployKubernetesCmd.Flags().Bool("ipv4", false, "assign public ipv4 for master")
 	deployKubernetesCmd.Flags().Bool("ipv6", false, "assign public ipv6 for master")
