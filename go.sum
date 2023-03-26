@@ -241,6 +241,8 @@ github.com/julienschmidt/httprouter v1.2.0/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7V
 github.com/jung-kurt/gofpdf v1.0.3-0.20190309125859-24315acbbda5/go.mod h1:7Id9E/uU8ce6rXgefFLlgrJj/GYY22cpxn+r32jIOes=
 github.com/jwilder/encoding v0.0.0-20170811194829-b4e1701a28ef/go.mod h1:Ct9fl0F6iIOGgxJ5npU/IUOhOhqlVrGjyIZc8/MagT0=
 github.com/karalabe/usb v0.0.2/go.mod h1:Od972xHfMJowv7NGVDiWVxk2zxnWgjLlJzE+F4F7AGU=
+github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 h1:iQTw/8FWTuc7uiaSepXwyf3o52HaUYcV+Tu66S3F5GA=
+github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0/go.mod h1:1NbS8ALrpOvjt0rHPNLyCIeMtbizbir8U//inJ+zuB8=
 github.com/kisielk/errcheck v1.2.0/go.mod h1:/BMXB+zMLi60iA8Vv6Ksmxu/1UDYcXs4uQLJ+jE2L00=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/klauspost/compress v1.4.0/go.mod h1:RyIbtBH6LamlWaDj8nUwkbUhJ87Yi3uG0guNDohfE1A=
@@ -353,6 +355,8 @@ github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQD
 github.com/segmentio/kafka-go v0.1.0/go.mod h1:X6itGqS9L4jDletMsxZ7Dz+JFWxM6JHfPOCvTvk+EJo=
 github.com/segmentio/kafka-go v0.2.0/go.mod h1:X6itGqS9L4jDletMsxZ7Dz+JFWxM6JHfPOCvTvk+EJo=
 github.com/sergi/go-diff v1.0.0/go.mod h1:0CfEIISq7TuYL3j771MWULgwwjU+GofnZX9QAmXWZgo=
+github.com/sevlyar/go-daemon v0.1.6 h1:EUh1MDjEM4BI109Jign0EaknA2izkOyi0LV3ro3QQGs=
+github.com/sevlyar/go-daemon v0.1.6/go.mod h1:6dJpPatBT9eUwM5VCw9Bt6CdX9Tk6UWvhW3MebLDRKE=
 github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible/go.mod h1:5b4v6he4MtMOwMlS0TUMTu2PcXUg8+E1lC7eC3UO/RA=
 github.com/shirou/gopsutil v3.21.11+incompatible h1:+1+c1VGhc88SSonWP6foOcLhvnKlUeu/erjjvaPEYiI=
 github.com/shurcooL/sanitized_anchor_name v1.0.0/go.mod h1:1NzhyTcUVG4SuEtjjoZeVRXNmyL/1OwPU0+IJeTBvfc=
@@ -386,12 +390,8 @@ github.com/stretchr/testify v1.8.2/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o
 github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7/go.mod h1:q4W45IWZaF22tdD+VEXcAWRA037jwmWEB5VWYORlTpc=
 github.com/threefoldtech/go-substrate-rpc-client/v4 v4.0.6-0.20230102154731-7c633b7d3c71 h1:vvoXPRI10quMOEXHKcakKhBZe+TlLXhNsh1wwX4cyk4=
 github.com/threefoldtech/go-substrate-rpc-client/v4 v4.0.6-0.20230102154731-7c633b7d3c71/go.mod h1:5g1oM4Zu3BOaLpsKQ+O8PAv2kNuq+kPcA1VzFbsSqxE=
-github.com/threefoldtech/grid3-go v0.0.0-20230321135037-e34aea81c9f1 h1:oOtnMuprQIkaWSU9SOMecmzKn8mfqyFYN8HkmwenOmM=
-github.com/threefoldtech/grid3-go v0.0.0-20230321135037-e34aea81c9f1/go.mod h1:BlL1XD1JQdNcwWEYa07jvQuDUuEmMwIGr4huqhlvH30=
-github.com/threefoldtech/grid3-go v0.0.0-20230322121946-b07a185f307f h1:TnwYxWNkfgAaXMu02GJ52AWtWQLQO8ONU8GP7ed5h9A=
-github.com/threefoldtech/grid3-go v0.0.0-20230322121946-b07a185f307f/go.mod h1:BlL1XD1JQdNcwWEYa07jvQuDUuEmMwIGr4huqhlvH30=
-github.com/threefoldtech/grid3-go v0.0.0-20230322122518-9548b74acf15 h1:5zFRyJWxnGAS1heijEfHGiWe+J66ydAr+vbHsn9ZReI=
-github.com/threefoldtech/grid3-go v0.0.0-20230322122518-9548b74acf15/go.mod h1:BlL1XD1JQdNcwWEYa07jvQuDUuEmMwIGr4huqhlvH30=
+github.com/threefoldtech/grid3-go v0.0.0-20230326140047-c4508ba0536c h1:hAkcsl/NgDQCo3t7jxMcQuiexXquKvekT1xywXHLNec=
+github.com/threefoldtech/grid3-go v0.0.0-20230326140047-c4508ba0536c/go.mod h1:HSQoZnsAgcDVzibSjp1x1V1o4zWXdGmhhlpxOtgdWwc=
 github.com/threefoldtech/grid_proxy_server v1.6.12 h1:kz16ZDPUC8w/03QqsyWlto+Ie0+Xnjx9NttgRr4oy+U=
 github.com/threefoldtech/grid_proxy_server v1.6.12/go.mod h1:CCj6+Y+8juSCp+FCtaYa1rZAYFAc+vrX3Mh+dzoc4m8=
 github.com/threefoldtech/rmb-sdk-go v1.0.1-0.20230308130815-83a645307186 h1:Wh2HLIlQulC+W8gAlovEpLWtOR9RAplxY28ESaURYZ8=
