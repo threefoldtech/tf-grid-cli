@@ -4,7 +4,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/sevlyar/go-daemon"
 	"github.com/spf13/cobra"
-	command "github.com/threefoldtech/tf-grid-cli/internal/cmd"
+	command "github.com/threefoldtech/tf-grid-cli/pkg/cmd"
 )
 
 var serverCmd = &cobra.Command{
@@ -31,7 +31,7 @@ var serverCmd = &cobra.Command{
 
 		err = command.RPCServer()
 		if err != nil {
-			log.Fatal().Err(err)
+			log.Fatal().Err(err).Send()
 		}
 	},
 }

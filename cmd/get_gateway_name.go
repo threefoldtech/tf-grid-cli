@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/threefoldtech/grid3-go/deployer"
-	"github.com/threefoldtech/tf-grid-cli/internal/config"
+	"github.com/threefoldtech/tf-grid-cli/pkg/config"
 )
 
 // getGatewayNameCmd represents the get gateway name command

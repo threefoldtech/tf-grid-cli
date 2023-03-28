@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	server "github.com/threefoldtech/tf-grid-cli/internal/rpc"
+	server "github.com/threefoldtech/tf-grid-cli/pkg/server"
 )
 
 func RPCServer() error {

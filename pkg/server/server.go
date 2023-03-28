@@ -9,6 +9,8 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+
+	router "github.com/threefoldtech/tf-grid-cli/pkg/server/router"
 )
 
 type Server struct {
@@ -38,24 +40,44 @@ func NewServer() (*Server, error) {
 		return nil, errors.Wrap(err, "failed to create new redis client")
 	}
 
-	router := Router{
-		routes: make(map[string]func(ctx context.Context, data string) (response Response)),
+	r := Router{
+		routes: make(map[string]func(ctx context.Context, data string) (string, error)),
 	}
 
 	server := Server{
 		redisClient,
-		router,
+		r,
 	}
 
-	server.Register("login", Login)
-	server.Register("machines.deploy", MachinesDeploy)
-	server.Register("machines.get", MachinesGet)
-	server.Register("machines.delete", MachinesDelete)
+	server.Register("login", router.Login)
+
+	server.Register("machines.deploy", router.MachinesDeploy)
+	server.Register("machines.get", router.MachinesGet)
+	server.Register("machines.delete", router.MachinesDelete)
+	server.Register("machines.machine.add", router.MachineAdd)
+	server.Register("machines.machine.remove", router.MachineRemove)
+
+	server.Register("gateway.name.deploy", router.GatewayNameDeploy)
+	server.Register("gateawy.name.get", router.GatewayNameGet)
+	server.Register("gateway.name.delete", router.GatewayNameDelete)
+	server.Register("gateway.fqdn.deploy", router.GatewayFQDNDeploy)
+	server.Register("gateway.fqdn.get", router.GatewayFQDNGet)
+	server.Register("gateway.fqdn.delete", router.GatewayFQDNDelete)
+
+	server.Register("k8s.get", router.K8sGet)
+	server.Register("k8s.deploy", router.K8sDeploy)
+	server.Register("k8s.delete", router.K8sDelete)
+	server.Register("k8s.node.add", router.K8sAddNode)
+	server.Register("k8s.node.delete", router.K8sRemoveNode)
+
+	server.Register("zdb.deploy", router.ZDBDeploy)
+	server.Register("zdb.delete", router.ZDBDelete)
+	server.Register("zdb.get", router.ZDBGet)
 
 	return &server, nil
 }
 
-func (s *Server) Register(route string, fn func(context.Context, string) Response) {
+func (s *Server) Register(route string, fn func(context.Context, string) (string, error)) {
 	s.router.routes[route] = fn
 }
 
@@ -128,7 +150,12 @@ func (s *Server) process(ctx context.Context, message []byte) {
 		return
 	}
 
-	resopnse := cmd(ctx, args.Data)
+	res, err := cmd(ctx, args.Data)
+	resopnse := Response{
+		Result: res,
+		Err:    err,
+	}
+
 	b, err := json.Marshal(resopnse)
 	if err != nil {
 		log.Err(err).Msg("failed to marshal response")

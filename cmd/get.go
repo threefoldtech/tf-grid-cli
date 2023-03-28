@@ -10,7 +10,3 @@ var getCmd = &cobra.Command{
 	Use:   "get",
 	Short: "Get a deployed resource from Threefold grid",
 }
-
-func init() {
-	rootCmd.AddCommand(getCmd)
-}

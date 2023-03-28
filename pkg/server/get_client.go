@@ -3,7 +3,7 @@ package server
 import (
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/grid3-go/deployer"
-	"github.com/threefoldtech/tf-grid-cli/internal/config"
+	"github.com/threefoldtech/tf-grid-cli/pkg/config"
 )
 
 func getClient() (deployer.TFPluginClient, error) {

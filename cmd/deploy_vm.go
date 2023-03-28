@@ -9,8 +9,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/threefoldtech/grid3-go/deployer"
 	"github.com/threefoldtech/grid3-go/workloads"
-	"github.com/threefoldtech/tf-grid-cli/internal/config"
-	"github.com/threefoldtech/tf-grid-cli/internal/filters"
+	"github.com/threefoldtech/tf-grid-cli/pkg/config"
+	"github.com/threefoldtech/tf-grid-cli/pkg/filters"
 )
 
 var ubuntuFlist = "https://hub.grid.tf/tf-official-apps/threefoldtech-ubuntu-22.04.flist"

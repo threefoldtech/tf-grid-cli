@@ -2,7 +2,7 @@ package procedure
 
 import (
 	"github.com/pkg/errors"
-	"github.com/threefoldtech/tf-grid-cli/internal/config"
+	"github.com/threefoldtech/tf-grid-cli/pkg/config"
 )
 
 type Credentials struct {

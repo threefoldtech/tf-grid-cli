@@ -6,8 +6,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/threefoldtech/grid3-go/deployer"
 	"github.com/threefoldtech/grid3-go/workloads"
-	"github.com/threefoldtech/tf-grid-cli/internal/config"
-	"github.com/threefoldtech/tf-grid-cli/internal/filters"
+	"github.com/threefoldtech/tf-grid-cli/pkg/config"
+	"github.com/threefoldtech/tf-grid-cli/pkg/filters"
 )
 
 // deployGatewayFQDNCmd represents the deploy gateway fqdn command
