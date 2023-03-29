@@ -68,7 +68,7 @@ func NewServer() (*Server, error) {
 	server.Register("k8s.deploy", router.K8sDeploy)
 	server.Register("k8s.delete", router.K8sDelete)
 	server.Register("k8s.node.add", router.K8sAddNode)
-	server.Register("k8s.node.delete", router.K8sRemoveNode)
+	server.Register("k8s.node.remove", router.K8sRemoveNode)
 
 	server.Register("zdb.deploy", router.ZDBDeploy)
 	server.Register("zdb.delete", router.ZDBDelete)
