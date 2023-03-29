@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -19,15 +18,23 @@ type Server struct {
 }
 
 type Request struct {
-	RetQueue string `json:"ret_queue"`
-	Now      uint64 `json:"now"`
-	Cmd      string `json:"cmd"`
-	Data     string `json:"data"`
+	JsonRPC string          `json:"jsonrpc"`
+	Method  string          `json:"method"`
+	Params  json.RawMessage `json:"params"`
+	ID      string          `json:"id"`
 }
 
+// either result or error must has value
 type Response struct {
-	Result string `json:"result"`
-	Err    error  `json:"error"`
+	JsonRPC string          `json:"jsonrpc"`
+	Result  json.RawMessage `json:"result,omitempty"`
+	Error   Error           `json:"error,omitempty"`
+	ID      string          `json:"id"`
+}
+
+type Error struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
 }
 
 type RedisClient struct {
@@ -144,39 +151,54 @@ func (s *Server) process(ctx context.Context, message []byte) {
 		return
 	}
 
-	cmd, ok := s.router.routes[args.Cmd]
+	cmd, ok := s.router.routes[args.Method]
 	if !ok {
 		log.Error().Msg("invalid command. message is dropped")
 		return
 	}
 
-	res, err := cmd(ctx, args.Data)
-	resopnse := Response{
-		Result: res,
-		Err:    err,
+	res, err := cmd(ctx, string(args.Params))
+
+	response := Response{
+		JsonRPC: args.JsonRPC,
+		ID:      args.ID,
 	}
 
-	b, err := json.Marshal(resopnse)
+	if err != nil {
+		response.Error = Error{
+			Code:    400,
+			Message: err.Error(),
+		}
+	}
+
+	if res == "" {
+		res = "Success"
+	}
+
+	b, err := json.Marshal(res)
 	if err != nil {
 		log.Err(err).Msg("failed to marshal response")
 		return
 	}
 
+	response.Result = b
+
 	con := s.redisClient.Pool.Get()
 	defer con.Close()
 
-	_, err = con.Do("RPUSH", args.RetQueue, b)
+	_, err = con.Do("RPUSH", args.ID, response)
 	if err != nil {
 		log.Err(err).Msg("failed to push response bytes into redis")
 	}
 }
 
 func validateArgs(args Request) error {
+	// validate jsonrpc standard format
 	// any kind of validation on the incoming message should happen here
 
-	if time.Since(time.Unix(int64(args.Now), 0)) > time.Minute {
-		return fmt.Errorf("message with timestamp %d expired", args.Now)
-	}
+	// if time.Since(time.Unix(int64(args.Now), 0)) > time.Minute {
+	// 	return fmt.Errorf("message with timestamp %d expired", args.Now)
+	// }
 
 	return nil
 }
