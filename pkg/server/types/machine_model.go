@@ -13,10 +13,10 @@ type MachinesModel struct {
 }
 
 type Network struct {
-	Name               string `json:"name"`                 // network name
 	AddWireguardAccess bool   `json:"add_wireguard_access"` // true to add access node
 	IPRange            string `json:"ip_range"`
 
 	// computed
+	Name            string `json:"name"` // network name will be (projectname.network)
 	WireguardConfig string
 }

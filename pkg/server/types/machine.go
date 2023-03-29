@@ -1,6 +1,8 @@
 package types
 
-import "github.com/threefoldtech/zos/pkg/gridtypes/zos"
+import (
+	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
+)
 
 type Machine struct {
 	NodeID      uint32
@@ -33,15 +35,16 @@ type Zlog struct {
 
 // Disk struct
 type Disk struct {
-	Name        string
 	MountPoint  string
 	SizeGB      int
 	Description string
+
+	// computed
+	Name string
 }
 
 // QSFS struct
 type QSFS struct {
-	Name                 string
 	MountPoint           string
 	Description          string
 	Cache                int
@@ -57,6 +60,7 @@ type QSFS struct {
 	Groups               Groups
 
 	// computed
+	Name            string
 	MetricsEndpoint string
 }
 
@@ -82,27 +86,3 @@ type Groups []Group
 
 // Backends is a list of backends
 type Backends []Backend
-
-// type MachineResult struct {
-// 	NodeID      uint32
-// 	Name        string
-// 	Flist       string
-// 	PublicIP    bool
-// 	PublicIP6   bool
-// 	Planetary   bool
-// 	Description string
-// 	CPU         int
-// 	Memory      int
-// 	RootfsSize  int
-// 	Entrypoint  string
-// 	Zlogs       []Zlog
-// 	Disks       []Disk
-// 	QSFSs       []QSFS
-// 	EnvVars     map[string]string
-
-// 	// computed
-// 	ComputedIP4 string
-// 	ComputedIP6 string
-// 	WGIP        string
-// 	YggIP       string
-// }
