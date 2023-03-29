@@ -26,10 +26,10 @@ type Request struct {
 
 // either result or error must has value
 type Response struct {
-	JsonRPC string          `json:"jsonrpc"`
-	Result  json.RawMessage `json:"result,omitempty"`
-	Error   Error           `json:"error,omitempty"`
-	ID      string          `json:"id"`
+	JsonRPC string           `json:"jsonrpc"`
+	Result  *json.RawMessage `json:"result,omitempty"`
+	Error   *Error           `json:"error,omitempty"`
+	ID      string           `json:"id"`
 }
 
 type Error struct {
@@ -56,30 +56,30 @@ func NewServer() (*Server, error) {
 		r,
 	}
 
-	server.Register("login", router.Login)
+	server.Register("tfgrid.login", router.Login)
 
-	server.Register("machines.deploy", router.MachinesDeploy)
-	server.Register("machines.get", router.MachinesGet)
-	server.Register("machines.delete", router.MachinesDelete)
-	server.Register("machines.machine.add", router.MachineAdd)
-	server.Register("machines.machine.remove", router.MachineRemove)
+	// server.Register("tfgrid.machines.deploy", router.MachinesDeploy)
+	// server.Register("tfgrid.machines.get", router.MachinesGet)
+	// server.Register("tfgrid.machines.delete", router.MachinesDelete)
+	// server.Register("tfgrid.machines.machine.add", router.MachineAdd)
+	// server.Register("tfgrid.machines.machine.remove", router.MachineRemove)
 
-	server.Register("gateway.name.deploy", router.GatewayNameDeploy)
-	server.Register("gateawy.name.get", router.GatewayNameGet)
-	server.Register("gateway.name.delete", router.GatewayNameDelete)
-	server.Register("gateway.fqdn.deploy", router.GatewayFQDNDeploy)
-	server.Register("gateway.fqdn.get", router.GatewayFQDNGet)
-	server.Register("gateway.fqdn.delete", router.GatewayFQDNDelete)
+	// server.Register("tfgrid.gateway.name.deploy", router.GatewayNameDeploy)
+	// server.Register("tfgrid.gateawy.name.get", router.GatewayNameGet)
+	// server.Register("tfgrid.gateway.name.delete", router.GatewayNameDelete)
+	// server.Register("tfgrid.gateway.fqdn.deploy", router.GatewayFQDNDeploy)
+	// server.Register("tfgrid.gateway.fqdn.get", router.GatewayFQDNGet)
+	// server.Register("tfgrid.gateway.fqdn.delete", router.GatewayFQDNDelete)
 
-	server.Register("k8s.get", router.K8sGet)
-	server.Register("k8s.deploy", router.K8sDeploy)
-	server.Register("k8s.delete", router.K8sDelete)
-	server.Register("k8s.node.add", router.K8sAddNode)
-	server.Register("k8s.node.remove", router.K8sRemoveNode)
+	// server.Register("tfgrid.k8s.get", router.K8sGet)
+	// server.Register("tfgrid.k8s.deploy", router.K8sDeploy)
+	// server.Register("tfgrid.k8s.delete", router.K8sDelete)
+	// server.Register("tfgrid.k8s.node.add", router.K8sAddNode)
+	// server.Register("tfgrid.k8s.node.remove", router.K8sRemoveNode)
 
-	server.Register("zdb.deploy", router.ZDBDeploy)
-	server.Register("zdb.delete", router.ZDBDelete)
-	server.Register("zdb.get", router.ZDBGet)
+	// server.Register("tfgrid.zdb.deploy", router.ZDBDeploy)
+	// server.Register("tfgrid.zdb.delete", router.ZDBDelete)
+	// server.Register("tfgrid.zdb.get", router.ZDBGet)
 
 	return &server, nil
 }
@@ -165,7 +165,7 @@ func (s *Server) process(ctx context.Context, message []byte) {
 	}
 
 	if err != nil {
-		response.Error = Error{
+		response.Error = &Error{
 			Code:    400,
 			Message: err.Error(),
 		}
@@ -181,12 +181,20 @@ func (s *Server) process(ctx context.Context, message []byte) {
 		return
 	}
 
-	response.Result = b
+	// Fix?
+	response.Result = &json.RawMessage{}
+	*response.Result = b
 
 	con := s.redisClient.Pool.Get()
 	defer con.Close()
 
-	_, err = con.Do("RPUSH", args.ID, response)
+	r, err := json.Marshal(response)
+	if err != nil {
+		log.Err(err).Msg("failed to marshal response")
+		return
+	}
+
+	_, err = con.Do("RPUSH", args.ID, r)
 	if err != nil {
 		log.Err(err).Msg("failed to push response bytes into redis")
 	}
