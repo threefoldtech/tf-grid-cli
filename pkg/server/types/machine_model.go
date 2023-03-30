@@ -9,7 +9,7 @@ type MachinesModel struct {
 	Description string    `json:"description"`
 
 	// computed
-	NodeDeploymentID map[uint32]uint64
+	// NodeDeploymentID map[uint32]uint64
 }
 
 type Network struct {
@@ -18,5 +18,5 @@ type Network struct {
 
 	// computed
 	Name            string `json:"name"` // network name will be (projectname.network)
-	WireguardConfig string
+	WireguardConfig string `json:"wireguard_config"`
 }

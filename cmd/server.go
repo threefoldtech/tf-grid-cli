@@ -29,8 +29,7 @@ var serverCmd = &cobra.Command{
 			_ = ctx.Release()
 		}()
 
-		err = command.RPCServer()
-		if err != nil {
+		if err := command.RPCServer(); err != nil {
 			log.Fatal().Err(err).Send()
 		}
 	},

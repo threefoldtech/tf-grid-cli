@@ -5,7 +5,7 @@ import (
 )
 
 type Router struct {
-	routes map[string]func(ctx context.Context, data string) (string, error)
+	routes map[string]func(ctx context.Context, data string) (interface{}, error)
 }
 
 // func Login(ctx context.Context, data string) Response {

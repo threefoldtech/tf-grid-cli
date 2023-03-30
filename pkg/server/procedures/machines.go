@@ -93,7 +93,7 @@ func deployDeployment(ctx context.Context, model *types.MachinesModel, client *d
 		nodeMachineMap[machine.NodeID] = append(nodeMachineMap[machine.NodeID], &model.Machines[idx])
 	}
 
-	networkName := fmt.Sprint("%s.network", model.Name)
+	networkName := fmt.Sprintf("%s_network", model.Name)
 
 	for nodeID, machines := range nodeMachineMap {
 		vms := []workloads.VM{}
@@ -132,10 +132,11 @@ func deployNetwork(ctx context.Context, model *types.MachinesModel, client *depl
 	}
 
 	znet := workloads.ZNet{
-		Name:        fmt.Sprintf("%s_network", model.Name),
-		Nodes:       nodeList,
-		IPRange:     ipRange,
-		AddWGAccess: model.Network.AddWireguardAccess,
+		Name:         fmt.Sprintf("%s_network", model.Name),
+		Nodes:        nodeList,
+		IPRange:      ipRange,
+		AddWGAccess:  model.Network.AddWireguardAccess,
+		SolutionType: model.Name,
 	}
 
 	err = client.NetworkDeployer.Deploy(ctx, &znet)
@@ -184,7 +185,7 @@ func extractWorkloads(machine *types.Machine, networkName string) (workloads.VM,
 					Password:  b.Password,
 				})
 			}
-			groups = append(groups, workloads.Group{bs})
+			groups = append(groups, workloads.Group{Backends: bs})
 		}
 
 		qsfss = append(qsfss, workloads.QSFS{
@@ -239,32 +240,11 @@ func extractWorkloads(machine *types.Machine, networkName string) (workloads.VM,
 }
 
 func MachinesDelete(ctx context.Context, name string, client *deployer.TFPluginClient) error {
-	contracts, err := client.ContractsGetter.ListContractsOfProjectName(name)
-	if err != nil {
-		return errors.Wrapf(err, "failed to retreive contracts with project name %s", name)
-	}
-
-	notCanceled := []string{}
-
-	for _, c := range contracts.NodeContracts {
-		contractID, err := strconv.Atoi(c.ContractID)
-		if err != nil {
-			notCanceled = append(notCanceled, c.ContractID)
-			continue
-		}
-
-		if err := client.SubstrateConn.CancelContract(client.Identity, uint64(contractID)); err != nil {
-			notCanceled = append(notCanceled, c.ContractID)
-			continue
-		}
-	}
-
-	if len(notCanceled) > 0 {
-		return fmt.Errorf("failed to cancel the following contracs, retry to delete or cancel them manually: %v", notCanceled)
+	if err := client.CancelByProjectName(name); err != nil {
+		return errors.Wrapf(err, "failed to cancel contracts")
 	}
 
 	return nil
-
 }
 
 func MachinesGet(ctx context.Context, name string, client *deployer.TFPluginClient) (types.MachinesModel, error) {
@@ -372,7 +352,7 @@ func MachinesGet(ctx context.Context, name string, client *deployer.TFPluginClie
 							Password:  b.Password,
 						})
 					}
-					groups = append(groups, types.Group{bs})
+					groups = append(groups, types.Group{Backends: bs})
 				}
 
 				machine.QSFSs = append(machine.QSFSs, types.QSFS{

@@ -5,77 +5,77 @@ import (
 )
 
 type Machine struct {
-	NodeID      uint32
-	Name        string
-	Flist       string
-	PublicIP    bool
-	PublicIP6   bool
-	Planetary   bool
-	Description string
-	CPU         int
-	Memory      int
-	RootfsSize  int
-	Entrypoint  string
-	Zlogs       []Zlog
-	Disks       []Disk
-	QSFSs       []QSFS
-	EnvVars     map[string]string
+	NodeID      uint32            `json:"node_id"`
+	Name        string            `json:"name"`
+	Flist       string            `json:"flist"`
+	PublicIP    bool              `json:"public_ip"`
+	PublicIP6   bool              `json:"public_ip6"`
+	Planetary   bool              `json:"planetary"`
+	Description string            `json:"description"`
+	CPU         int               `json:"cpu"`
+	Memory      int               `json:"memory"`
+	RootfsSize  int               `json:"rootfs_size"`
+	Entrypoint  string            `json:"entrypoint"`
+	Zlogs       []Zlog            `json:"zlogs"`
+	Disks       []Disk            `json:"disks"`
+	QSFSs       []QSFS            `json:"qsfss"`
+	EnvVars     map[string]string `json:"env_vars"`
 
 	// computed
-	ComputedIP4 string
-	ComputedIP6 string
-	WGIP        string
-	YggIP       string
+	ComputedIP4 string `json:"computed_ip4"`
+	ComputedIP6 string `json:"computed_ip6"`
+	WGIP        string `json:"wireguard_ip"`
+	YggIP       string `json:"ygg_ip"`
 }
 
 // Zlog logger struct
 type Zlog struct {
-	Output string
+	Output string `json:"output"`
 }
 
 // Disk struct
 type Disk struct {
-	MountPoint  string
-	SizeGB      int
-	Description string
+	MountPoint  string `json:"mountpoint"`
+	SizeGB      int    `json:"size"`
+	Description string `json:"description"`
 
 	// computed
-	Name string
+	Name string `json:"name"`
 }
 
 // QSFS struct
 type QSFS struct {
-	MountPoint           string
-	Description          string
-	Cache                int
-	MinimalShards        uint32
-	ExpectedShards       uint32
-	RedundantGroups      uint32
-	RedundantNodes       uint32
-	MaxZDBDataDirSize    uint32
-	EncryptionAlgorithm  string
-	EncryptionKey        string
-	CompressionAlgorithm string
-	Metadata             Metadata
-	Groups               Groups
+	MountPoint           string   `json:"mountpoint"`
+	Description          string   `json:"description"`
+	Cache                int      `json:"cache"`
+	MinimalShards        uint32   `json:"minimal_shards"`
+	ExpectedShards       uint32   `json:"expected_shards"`
+	RedundantGroups      uint32   `json:"redundant_groups"`
+	RedundantNodes       uint32   `json:"redundant_nodes"`
+	MaxZDBDataDirSize    uint32   `json:"max_zdb_data_dir_size"`
+	EncryptionAlgorithm  string   `json:"encryption_algorithm"`
+	EncryptionKey        string   `json:"encryption_key"`
+	CompressionAlgorithm string   `json:"compression_algorithm"`
+	Metadata             Metadata `json:"metadata"`
+	Groups               Groups   `json:"groups"`
 
 	// computed
-	Name            string
-	MetricsEndpoint string
+	Name            string `json:"name"`
+	MetricsEndpoint string `json:"metrics_endpoint"`
 }
 
 // Metadata for QSFS
 type Metadata struct {
-	Type                string
-	Prefix              string
-	EncryptionAlgorithm string
-	EncryptionKey       string
-	Backends            Backends
+	Type                string   `json:"type"`
+	Prefix              string   `json:"prefix"`
+	EncryptionAlgorithm string   `json:"encryption_algorithm"`
+	EncryptionKey       string   `json:"encryption_key"`
+	Backends            Backends `json:"backends"`
 }
 
 // Group is a zos group
 type Group struct {
-	Backends Backends
+	Backends Backends `json:"backends"`
 }
 
 // Backend is a zos backend

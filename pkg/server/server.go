@@ -26,10 +26,10 @@ type Request struct {
 
 // either result or error must has value
 type Response struct {
-	JsonRPC string           `json:"jsonrpc"`
-	Result  *json.RawMessage `json:"result,omitempty"`
-	Error   *Error           `json:"error,omitempty"`
-	ID      string           `json:"id"`
+	JsonRPC string      `json:"jsonrpc"`
+	Result  interface{} `json:"result,omitempty"`
+	Error   *Error      `json:"error,omitempty"`
+	ID      string      `json:"id"`
 }
 
 type Error struct {
@@ -48,7 +48,7 @@ func NewServer() (*Server, error) {
 	}
 
 	r := Router{
-		routes: make(map[string]func(ctx context.Context, data string) (string, error)),
+		routes: make(map[string]func(ctx context.Context, data string) (interface{}, error)),
 	}
 
 	server := Server{
@@ -58,9 +58,9 @@ func NewServer() (*Server, error) {
 
 	server.Register("tfgrid.login", router.Login)
 
-	// server.Register("tfgrid.machines.deploy", router.MachinesDeploy)
+	server.Register("tfgrid.machines.deploy", router.MachinesDeploy)
+	server.Register("tfgrid.machines.delete", router.MachinesDelete)
 	// server.Register("tfgrid.machines.get", router.MachinesGet)
-	// server.Register("tfgrid.machines.delete", router.MachinesDelete)
 	// server.Register("tfgrid.machines.machine.add", router.MachineAdd)
 	// server.Register("tfgrid.machines.machine.remove", router.MachineRemove)
 
@@ -84,7 +84,7 @@ func NewServer() (*Server, error) {
 	return &server, nil
 }
 
-func (s *Server) Register(route string, fn func(context.Context, string) (string, error)) {
+func (s *Server) Register(route string, fn func(context.Context, string) (interface{}, error)) {
 	s.router.routes[route] = fn
 }
 
@@ -162,6 +162,7 @@ func (s *Server) process(ctx context.Context, message []byte) {
 	response := Response{
 		JsonRPC: args.JsonRPC,
 		ID:      args.ID,
+		Result:  struct{}{},
 	}
 
 	if err != nil {
@@ -169,32 +170,22 @@ func (s *Server) process(ctx context.Context, message []byte) {
 			Code:    400,
 			Message: err.Error(),
 		}
+		response.Result = nil
 	}
 
-	if res == "" {
-		res = "Success"
+	if res != nil {
+		response.Result = res
 	}
-
-	b, err := json.Marshal(res)
-	if err != nil {
-		log.Err(err).Msg("failed to marshal response")
-		return
-	}
-
-	// Fix?
-	response.Result = &json.RawMessage{}
-	*response.Result = b
-
 	con := s.redisClient.Pool.Get()
 	defer con.Close()
 
-	r, err := json.Marshal(response)
+	responseBytes, err := json.Marshal(response)
 	if err != nil {
 		log.Err(err).Msg("failed to marshal response")
 		return
 	}
 
-	_, err = con.Do("RPUSH", args.ID, r)
+	_, err = con.Do("RPUSH", args.ID, responseBytes)
 	if err != nil {
 		log.Err(err).Msg("failed to push response bytes into redis")
 	}
