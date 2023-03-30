@@ -11,6 +11,16 @@ var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: "Run an rpc server listening for incoming commands to the tfgrid client",
 	Run: func(cmd *cobra.Command, args []string) {
+		if err := command.RPCServer(); err != nil {
+			log.Fatal().Err(err).Send()
+		}
+	},
+}
+
+var daemonCmd = &cobra.Command{
+	Use:   "daemon",
+	Short: "Run an rpc daemon listening for incoming commands to the tfgrid client",
+	Run: func(cmd *cobra.Command, args []string) {
 		ctx := &daemon.Context{
 			LogFilePerm: 0640,
 			WorkDir:     "/",
@@ -36,5 +46,5 @@ var serverCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(serverCmd)
+	rootCmd.AddCommand(serverCmd, daemonCmd)
 }
