@@ -9,12 +9,18 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	"github.com/threefoldtech/grid3-go/deployer"
 	router "github.com/threefoldtech/tf-grid-cli/pkg/server/router"
 )
 
 type Server struct {
 	redisClient RedisClient
 	router      Router
+	client      *deployer.TFPluginClient
+}
+
+type Router struct {
+	routes map[string]func(ctx context.Context, client *deployer.TFPluginClient, data string) (interface{}, error)
 }
 
 type Request struct {
@@ -48,19 +54,20 @@ func NewServer() (*Server, error) {
 	}
 
 	r := Router{
-		routes: make(map[string]func(ctx context.Context, data string) (interface{}, error)),
+		routes: make(map[string]func(ctx context.Context, client *deployer.TFPluginClient, data string) (interface{}, error)),
 	}
 
 	server := Server{
 		redisClient,
 		r,
+		&deployer.TFPluginClient{},
 	}
 
 	server.Register("tfgrid.login", router.Login)
 
 	server.Register("tfgrid.machines.deploy", router.MachinesDeploy)
 	server.Register("tfgrid.machines.delete", router.MachinesDelete)
-	// server.Register("tfgrid.machines.get", router.MachinesGet)
+	server.Register("tfgrid.machines.get", router.MachinesGet)
 	// server.Register("tfgrid.machines.machine.add", router.MachineAdd)
 	// server.Register("tfgrid.machines.machine.remove", router.MachineRemove)
 
@@ -84,7 +91,7 @@ func NewServer() (*Server, error) {
 	return &server, nil
 }
 
-func (s *Server) Register(route string, fn func(context.Context, string) (interface{}, error)) {
+func (s *Server) Register(route string, fn func(context.Context, *deployer.TFPluginClient, string) (interface{}, error)) {
 	s.router.routes[route] = fn
 }
 
@@ -153,12 +160,11 @@ func (s *Server) process(ctx context.Context, message []byte) {
 
 	cmd, ok := s.router.routes[args.Method]
 	if !ok {
-		log.Error().Msg("invalid command. message is dropped")
+		log.Error().Msgf("invalid command %s. message is dropped", args.Method)
 		return
 	}
 
-	res, err := cmd(ctx, string(args.Params))
-
+	res, err := cmd(ctx, s.client, string(args.Params))
 	response := Response{
 		JsonRPC: args.JsonRPC,
 		ID:      args.ID,
