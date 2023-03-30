@@ -78,15 +78,15 @@ func NewServer() (*Server, error) {
 	// server.Register("tfgrid.gateway.fqdn.get", router.GatewayFQDNGet)
 	// server.Register("tfgrid.gateway.fqdn.delete", router.GatewayFQDNDelete)
 
-	// server.Register("tfgrid.k8s.get", router.K8sGet)
-	// server.Register("tfgrid.k8s.deploy", router.K8sDeploy)
-	// server.Register("tfgrid.k8s.delete", router.K8sDelete)
+	server.Register("tfgrid.k8s.get", router.K8sGet)
+	server.Register("tfgrid.k8s.deploy", router.K8sDeploy)
+	server.Register("tfgrid.k8s.delete", router.K8sDelete)
 	// server.Register("tfgrid.k8s.node.add", router.K8sAddNode)
 	// server.Register("tfgrid.k8s.node.remove", router.K8sRemoveNode)
 
-	// server.Register("tfgrid.zdb.deploy", router.ZDBDeploy)
-	// server.Register("tfgrid.zdb.delete", router.ZDBDelete)
-	// server.Register("tfgrid.zdb.get", router.ZDBGet)
+	server.Register("tfgrid.zdb.deploy", router.ZDBDeploy)
+	server.Register("tfgrid.zdb.delete", router.ZDBDelete)
+	server.Register("tfgrid.zdb.get", router.ZDBGet)
 
 	return &server, nil
 }

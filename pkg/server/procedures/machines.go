@@ -450,6 +450,6 @@ func machineFromVM(vm *workloads.VM) types.Machine {
 	return machine
 }
 
-func MachineAdd(ctx context.Context, machine types.Machine, projectName string) (types.MachinesModel, error)
+// func MachineAdd(ctx context.Context, machine types.Machine, projectName string) (types.MachinesModel, error)
 
-func MachineRemove(ctx context.Context, machineName string, projectName string) (types.MachinesModel, error)
+// func MachineRemove(ctx context.Context, machineName string, projectName string) (types.MachinesModel, error)

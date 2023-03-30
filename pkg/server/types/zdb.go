@@ -1,17 +1,16 @@
 package types
 
-// ZDB workload struct
 type ZDB struct {
-	NodeID      uint32
-	Name        string
-	Password    string
-	Public      bool
-	Size        int
-	Description string
-	Mode        string
-	Port        uint32
-	Namespace   string
+	NodeID      uint32 `json:"node_id"`
+	Name        string `json:"name"`
+	Password    string `json:"password"`
+	Public      bool   `json:"public"`
+	Size        int    `json:"size"`
+	Description string `json:"description"`
+	Mode        string `json:"mode"`
+	Port        uint32 `json:"port"`
+	Namespace   string `json:"namespace"`
 
 	// computed
-	IPs []string
+	IPs []string `json:"ips"`
 }
