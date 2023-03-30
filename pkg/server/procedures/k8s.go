@@ -6,13 +6,15 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/grid3-go/deployer"
 	"github.com/threefoldtech/grid3-go/workloads"
 	"github.com/threefoldtech/tf-grid-cli/pkg/server/types"
+	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
-func K8sDeploy(ctx context.Context, cluster types.K8sCluster, client deployer.TFPluginClient) (types.K8sCluster, error) {
+func K8sDeploy(ctx context.Context, cluster types.K8sCluster, client *deployer.TFPluginClient) (types.K8sCluster, error) {
 	// validate project name is unique
 	contracts, err := client.ContractsGetter.ListContractsOfProjectName(cluster.Name)
 	if err != nil {
@@ -21,6 +23,41 @@ func K8sDeploy(ctx context.Context, cluster types.K8sCluster, client deployer.TF
 
 	if len(contracts.NameContracts) > 0 || len(contracts.NodeContracts) > 0 || len(contracts.RentContracts) > 0 {
 		return types.K8sCluster{}, fmt.Errorf("You have a cluster with the same name: %s", cluster.Name)
+	}
+
+	// deploy network
+	cluster.NetworkName = fmt.Sprintf("%s_network", cluster.Name)
+
+	nodeList := []uint32{}
+	nodeSet := map[uint32]struct{}{}
+	for _, node := range cluster.Workers {
+		if _, ok := nodeSet[node.NodeID]; !ok {
+			nodeList = append(nodeList, node.NodeID)
+			nodeSet[node.NodeID] = struct{}{}
+		}
+	}
+
+	if _, ok := nodeSet[cluster.Master.NodeID]; !ok {
+		nodeList = append(nodeList, cluster.Master.NodeID)
+		nodeSet[cluster.Master.NodeID] = struct{}{}
+	}
+
+	ipRange, err := gridtypes.ParseIPNet("10.1.0.0/16")
+	if err != nil {
+		return types.K8sCluster{}, errors.Wrapf(err, "network ip range (%s) is invalid", "10.1.0.0/16")
+	}
+
+	znet := workloads.ZNet{
+		// Name:         fmt.Sprintf("%s_network", cluster.NetworkName),
+		Name:         cluster.NetworkName,
+		Nodes:        nodeList,
+		IPRange:      ipRange,
+		SolutionType: cluster.Name,
+	}
+
+	err = client.NetworkDeployer.Deploy(ctx, &znet)
+	if err != nil {
+		return types.K8sCluster{}, errors.Wrap(err, "failed to deploy network")
 	}
 
 	// map to workloads.k8sCluster
@@ -38,6 +75,9 @@ func K8sDeploy(ctx context.Context, cluster types.K8sCluster, client deployer.TF
 		Master:       &master,
 		Workers:      workers,
 	}
+
+	log.Info().Msgf("workloadCluster: %+v", k8s)
+	log.Info().Msgf("Deploying....")
 
 	// Deploy workload
 	err = client.K8sDeployer.Deploy(ctx, &k8s)
@@ -57,99 +97,86 @@ func K8sDeploy(ctx context.Context, cluster types.K8sCluster, client deployer.TF
 	return cluster, nil
 }
 
-func K8sDelete(ctx context.Context, clusterName string, client deployer.TFPluginClient) error {
-	contracts, err := client.ContractsGetter.ListContractsOfProjectName(clusterName)
+func K8sDelete(ctx context.Context, clusterName string, client *deployer.TFPluginClient) error {
+	err := client.CancelByProjectName(clusterName)
 	if err != nil {
-		return errors.Wrapf(err, "Found no clusters with this name: %s", clusterName)
-	}
-
-	// allContracts :=  []interface{}{contracts.NameContracts, contracts.NodeContracts, contracts.RentContracts}
-
-	for _, contract := range contracts.NodeContracts {
-		num, err := strconv.ParseUint(contract.ContractID, 10, 64)
-		if err != nil {
-			return errors.Wrapf(err, "Couldn't convert ContractID: %s", contract.ContractID)
-		}
-
-		err = client.SubstrateConn.CancelContract(client.Identity, num)
-
-		if err != nil {
-			return errors.Wrapf(err, "Failed deleting Contract with ContractID: %d", num)
-		}
+		errors.Wrapf(err, "Failed to cancel cluster with name: %s", clusterName)
 	}
 
 	return nil
 }
 
-func K8sAddNode(ctx context.Context, clusterName string, node types.K8sNode) (types.K8sCluster, error)
+// func K8sAddNode(ctx context.Context, clusterName string, node types.K8sNode) (types.K8sCluster, error)
 
-func K8sRemoveNode(ctx context.Context, clusterName string, nodeName string) (types.K8sCluster, error)
+// func K8sRemoveNode(ctx context.Context, clusterName string, nodeName string) (types.K8sCluster, error)
 
-func K8sGet(ctx context.Context, clusterName string, client deployer.TFPluginClient) (types.K8sCluster, error) {
+func K8sGet(ctx context.Context, clusterName string, client *deployer.TFPluginClient) (types.K8sCluster, error) {
 	// get all contracts by project name
 	contracts, err := client.ContractsGetter.ListContractsOfProjectName(clusterName)
 	if err != nil {
 		return types.K8sCluster{}, errors.Wrapf(err, "Found no clusters with this name: %s", clusterName)
 	}
 
-	// get deployment for each contractId. to have each {nodeId:k8sNodeName}
-	masterMap := map[uint32]string{}
-	workerMap := map[uint32][]string{}
+	result := types.K8sCluster{
+		Name:    clusterName,
+		Master:  &types.K8sNode{},
+		Workers: []types.K8sNode{},
+	}
+
+	diskNameNodeNameMap := map[string]string{}
+	nodeNameDiskSizeMap := map[string]int{}
 
 	for _, contract := range contracts.NodeContracts {
 		nodeClient, err := client.NcPool.GetNodeClient(client.SubstrateConn, contract.NodeID)
 
-		cid, err := strconv.ParseUint(contracts.NodeContracts[0].ContractID, 10, 64)
+		cid, err := strconv.ParseUint(contract.ContractID, 10, 64)
 		if err != nil {
-			return types.K8sCluster{}, errors.Wrapf(err, "Couldn't convert ContractID: %s", contracts.NodeContracts[0].ContractID)
+			return types.K8sCluster{}, errors.Wrapf(err, "Couldn't convert ContractID: %s", contract.ContractID)
 		}
 
 		deployment, err := nodeClient.DeploymentGet(ctx, cid)
 
 		for _, workload := range deployment.Workloads {
-			vm := workloads.VM{}
 			if workload.Type == zos.ZMachineType {
+				vm := workloads.VM{}
+
 				vm, err = workloads.NewVMFromWorkload(&workload, &deployment)
 				if err != nil {
 					return types.K8sCluster{}, errors.Wrapf(err, "Failed to get vm from workload: %s", workload)
 				}
+
+				if len(vm.Mounts) == 1 {
+					diskNameNodeNameMap[vm.Mounts[0].DiskName] = vm.Name
+				}
+
+				if isWorker(vm) {
+					result.Workers = append(result.Workers, convertVMToK8sNode(vm))
+				} else {
+					masterNode := convertVMToK8sNode(vm)
+					result.Master = &masterNode
+
+					result.SSHKey = vm.EnvVars["SSH_KEY"]
+					result.Token = vm.EnvVars["K3S_TOKEN"]
+				}
 			}
-			if isWorker(vm) {
-				workerMap[contract.NodeID] = append(workerMap[contract.NodeID], vm.Name)
-			} else {
-				masterMap[contract.NodeID] = vm.Name
+		}
+
+		for _, workload := range deployment.Workloads {
+			if workload.Type == zos.ZMountType {
+				disk, err := workloads.NewDiskFromWorkload(&workload)
+				if err != nil {
+					return types.K8sCluster{}, errors.Wrapf(err, "Failed to get disk from workload: %s", workload)
+				}
+				nodeName := diskNameNodeNameMap[disk.Name]
+				nodeNameDiskSizeMap[nodeName] = disk.SizeGB
 			}
 		}
 	}
 
-	// load the nodes from the grid
-	k8s, err := client.State.LoadK8sFromGrid(
-		masterMap,
-		workerMap,
-		clusterName,
-	)
-
-	if err != nil {
-		return types.K8sCluster{}, errors.Wrapf(err, "Failed to load K8s from the grid")
+	result.Master.DiskSize = nodeNameDiskSizeMap[result.Master.Name]
+	for idx := range result.Workers {
+		result.Workers[idx].DiskSize = nodeNameDiskSizeMap[result.Workers[idx].Name]
 	}
-
-	// build the result
-	master := convertK8sWorkloadToNode(*k8s.Master)
-	workers := []types.K8sNode{}
-
-	for _, worker := range k8s.Workers {
-		workers = append(workers, convertK8sWorkloadToNode(worker))
-	}
-
-	result := types.K8sCluster{
-		Name:             k8s.SolutionType,
-		Token:            k8s.Token,
-		SSHKey:           k8s.SSHKey,
-		NodeDeploymentID: k8s.NodeDeploymentID,
-		NodesIPRange:     k8s.NodesIPRange,
-		Master:           &master,
-	}
-
 	return result, nil
 }
 
@@ -183,6 +210,23 @@ func convertK8sWorkloadToNode(k8sNode workloads.K8sNode) types.K8sNode {
 		ComputedIP6: k8sNode.ComputedIP6,
 		WGIP:        k8sNode.IP,
 		YggIP:       k8sNode.YggIP,
+	}
+}
+
+func convertVMToK8sNode(vm workloads.VM) types.K8sNode {
+	return types.K8sNode{
+		Name:      vm.Name,
+		PublicIP:  vm.PublicIP,
+		PublicIP6: vm.PublicIP6,
+		Planetary: vm.Planetary,
+		Flist:     vm.Flist,
+		CPU:       vm.CPU,
+		Memory:    vm.Memory,
+
+		ComputedIP4: vm.ComputedIP,
+		ComputedIP6: vm.ComputedIP6,
+		WGIP:        vm.IP,
+		YggIP:       vm.YggIP,
 	}
 }
 
