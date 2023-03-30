@@ -5,14 +5,14 @@ import "github.com/threefoldtech/zos/pkg/gridtypes/zos"
 // GatewayNameModel struct for gateway name proxy
 type GatewayNameModel struct {
 	// Required
-	NodeID uint32
+	NodeID uint32 `json:"node_id"`
 	// Name the fully qualified domain name to use (cannot be present with Name)
-	Name string
+	Name string `json:"name"`
 	// Backends are list of backend ips
-	Backends []zos.Backend
+	Backends []zos.Backend `json:"backends"`
 
-	TLSPassthrough bool
-	Description    string
+	TLSPassthrough bool   `json:"tls_passthrough"`
+	Description    string `json:"description"`
 	// Optional
 	// Passthrough whether to pass tls traffic or not
 
@@ -20,7 +20,7 @@ type GatewayNameModel struct {
 
 	// FQDN deployed on the node
 	// NodeDeploymentID map[uint32]uint64
-	FQDN           string
-	NameContractID uint64
-	ContractID     uint64
+	FQDN           string `json:"fqdn"`
+	NameContractID uint64 `json:"name_contract_id"`
+	ContractID     uint64 `json:"contract_id"`
 }
