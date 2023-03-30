@@ -12,6 +12,7 @@ import (
 	"github.com/threefoldtech/tf-grid-cli/pkg/server/types"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
 // nodes should always be provided
@@ -139,6 +140,14 @@ func deployNetwork(ctx context.Context, model *types.MachinesModel, client *depl
 		SolutionType: model.Name,
 	}
 
+	if znet.AddWGAccess == true {
+		privateKey, err := wgtypes.GeneratePrivateKey()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to generate wireguard private key")
+		}
+		znet.ExternalSK = privateKey
+	}
+
 	err = client.NetworkDeployer.Deploy(ctx, &znet)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to deploy network")
@@ -256,9 +265,8 @@ func MachinesGet(ctx context.Context, name string, client *deployer.TFPluginClie
 	}
 	networkName := fmt.Sprintf("%s.network", name)
 
-	znet, err := client.State.LoadNetworkFromGrid(networkName)
-	if err != nil {
-		return types.MachinesModel{}, errors.Wrapf(err, "failed to retreive network data for project %s", name)
+	model.Network = types.Network{
+		Name: networkName,
 	}
 
 	for _, c := range contracts.NodeContracts {
@@ -291,6 +299,15 @@ func MachinesGet(ctx context.Context, name string, client *deployer.TFPluginClie
 				for _, mp := range vm.Mounts {
 					diskMountPoints[mp.DiskName] = mp.MountPoint
 				}
+			}
+			if dl.Workloads[idx].Type == zos.NetworkType && model.Network.IPRange == "" {
+				net, err := workloads.NewNetworkFromWorkload(dl.Workloads[idx], c.NodeID)
+				if err != nil {
+					return types.MachinesModel{}, errors.Wrapf(err, "failed to parse network %s data", dl.Workloads[idx].Name)
+				}
+
+				model.Network.AddWireguardAccess = net.AddWGAccess
+				model.Network.IPRange = net.IPRange.String()
 			}
 		}
 
@@ -391,12 +408,6 @@ func MachinesGet(ctx context.Context, name string, client *deployer.TFPluginClie
 	}
 
 	model.Name = name
-	model.Network = types.Network{
-		AddWireguardAccess: znet.AddWGAccess,
-		IPRange:            znet.IPRange.String(),
-		Name:               znet.Name,
-		WireguardConfig:    znet.AccessWGConfig,
-	}
 
 	return model, nil
 }
