@@ -10,7 +10,7 @@ require (
 	github.com/sevlyar/go-daemon v0.1.6
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.2
-	github.com/threefoldtech/grid3-go v0.0.0-20230326140047-c4508ba0536c
+	github.com/threefoldtech/grid3-go v1.0.2-0.20230403151102-cd78ab197417
 	github.com/threefoldtech/grid_proxy_server v1.6.12
 	github.com/threefoldtech/zos v0.5.6-0.20230224113017-e887a6ca3fc5
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20200609130330-bd2cb7843e1b
@@ -44,8 +44,8 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rs/cors v1.8.2 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/threefoldtech/rmb-sdk-go v1.0.1-0.20230308130815-83a645307186 // indirect
-	github.com/threefoldtech/substrate-client v0.1.3 // indirect
+	github.com/threefoldtech/rmb-sdk-go v1.0.1-0.20230316162347-255e7faa0006 // indirect
+	github.com/threefoldtech/substrate-client v0.1.5 // indirect
 	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
 	github.com/vedhavyas/go-subkey v1.0.3 // indirect
 	golang.org/x/crypto v0.7.0 // indirect
