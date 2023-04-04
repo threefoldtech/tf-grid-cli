@@ -144,8 +144,6 @@ func (r *Router) gatewayFQDNGet(ctx context.Context, projectName string) (Gatewa
 		if err != nil {
 			return GatewayFQDNModel{}, errors.Wrapf(err, "failed to parse gateway workload data")
 		}
-
-		break
 	}
 
 	res := GatewayFQDNModel{

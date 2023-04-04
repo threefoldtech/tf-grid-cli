@@ -119,7 +119,7 @@ func (r *Router) gatewayNameDeploy(ctx context.Context, gatewayNameModel Gateway
 
 func (r *Router) gatewayNameDelete(ctx context.Context, projectName string) error {
 	if err := r.Client.CancelByProjectName(projectName); err != nil {
-		return errors.Wrapf(err, "failed to cancel project %d", projectName)
+		return errors.Wrapf(err, "failed to cancel project %s", projectName)
 	}
 
 	return nil
@@ -156,15 +156,13 @@ func (r *Router) gatewayNameGet(ctx context.Context, projectName string) (Gatewa
 		return GatewayNameModel{}, errors.Wrapf(err, "failed to get deployment with contract id %d", nodeContractID)
 	}
 
-	gatewayWorkload := workloads.GatewayNameProxy{}
+	if len(dl.Workloads) != 1 {
+		return GatewayNameModel{}, errors.Wrapf(err, "deployment should include only one gateway workload, but %d were found", len(dl.Workloads))
+	}
 
-	for _, wl := range dl.Workloads {
-		gatewayWorkload, err = workloads.NewGatewayNameProxyFromZosWorkload(wl)
-		if err != nil {
-			return GatewayNameModel{}, errors.Wrapf(err, "failed to parse gateway workload data")
-		}
-
-		break
+	gatewayWorkload, err := workloads.NewGatewayNameProxyFromZosWorkload(dl.Workloads[0])
+	if err != nil {
+		return GatewayNameModel{}, errors.Wrapf(err, "failed to parse gateway workload data")
 	}
 
 	nameContractID, err := strconv.ParseUint(contracts.NameContracts[0].ContractID, 0, 64)

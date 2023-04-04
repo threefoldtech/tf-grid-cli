@@ -20,10 +20,7 @@ func (r *Router) Login(ctx context.Context, data string) (interface{}, error) {
 		return nil, errors.Wrap(err, "failed to unmarshal credentials data")
 	}
 
-	if r.Client != nil {
-		// TODO: if server already has an initialized client, close old client
-
-	}
+	// TODO: if server already has an initialized client, close old client
 
 	newClient, err := deployer.NewTFPluginClient(cred.Mnemonics, "sr25519", cred.Network, "", "", "", 10, true, false)
 	if err != nil {

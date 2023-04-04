@@ -166,7 +166,7 @@ func (r *Router) k8sDeploy(ctx context.Context, cluster K8sCluster, projectName 
 func (r *Router) k8sDelete(ctx context.Context, projectName string) error {
 	err := r.Client.CancelByProjectName(projectName)
 	if err != nil {
-		errors.Wrapf(err, "failed to cancel project: %s", projectName)
+		return errors.Wrapf(err, "failed to cancel project: %s", projectName)
 	}
 
 	return nil
@@ -210,11 +210,9 @@ func (r *Router) k8sGet(ctx context.Context, clusterName string, projectName str
 
 		for _, workload := range deployment.Workloads {
 			if workload.Type == zos.ZMachineType {
-				vm := workloads.VM{}
-
-				vm, err = workloads.NewVMFromWorkload(&workload, &deployment)
+				vm, err := workloads.NewVMFromWorkload(&workload, &deployment)
 				if err != nil {
-					return K8sCluster{}, errors.Wrapf(err, "Failed to get vm from workload: %s", workload)
+					return K8sCluster{}, errors.Wrapf(err, "Failed to get vm from workload: %s", workload.Name)
 				}
 
 				if len(vm.Mounts) == 1 {
@@ -241,7 +239,7 @@ func (r *Router) k8sGet(ctx context.Context, clusterName string, projectName str
 			if workload.Type == zos.ZMountType {
 				disk, err := workloads.NewDiskFromWorkload(&workload)
 				if err != nil {
-					return K8sCluster{}, errors.Wrapf(err, "Failed to get disk from workload: %s", workload)
+					return K8sCluster{}, errors.Wrapf(err, "Failed to get disk from workload: %s", workload.Name)
 				}
 
 				nodeName := diskNameNodeNameMap[disk.Name]

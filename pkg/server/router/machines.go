@@ -298,7 +298,7 @@ func (r *Router) deployMahchinesNetwork(ctx context.Context, model *MachinesMode
 		SolutionType: projectName,
 	}
 
-	if znet.AddWGAccess == true {
+	if znet.AddWGAccess {
 		privateKey, err := wgtypes.GeneratePrivateKey()
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to generate wireguard private key")

@@ -98,6 +98,10 @@ func (r *Router) deployZDB(ctx context.Context, zdb ZDB, projectName string) (ZD
 
 	// get the result with the computed values
 	loadedZDB, err := r.Client.State.LoadZdbFromGrid(zdb.NodeID, zdb.Name, zdb.Name)
+	if err != nil {
+		return ZDB{}, errors.Wrapf(err, "failed to load zdb %s", zdb.Name)
+	}
+
 	result := NewZDBFromClientZDB(loadedZDB)
 	result.NodeID = zdb.NodeID
 
@@ -109,7 +113,7 @@ func (r *Router) deleteZDB(ctx context.Context, name string) error {
 	// TODO: fix canceling
 	err := r.Client.CancelByProjectName(name)
 	if err != nil {
-		errors.Wrapf(err, "Failed to cancel cluster with name: %s", name)
+		return errors.Wrapf(err, "Failed to cancel cluster with name: %s", name)
 	}
 
 	return nil
@@ -145,11 +149,9 @@ func (r *Router) getZDB(ctx context.Context, projectName string) (ZDB, error) {
 
 	for _, workload := range dl.Workloads {
 		if workload.Type == zos.ZDBType {
-			zdb := workloads.ZDB{}
-
-			zdb, err = workloads.NewZDBFromWorkload(&workload)
+			zdb, err := workloads.NewZDBFromWorkload(&workload)
 			if err != nil {
-				return ZDB{}, errors.Wrapf(err, "Failed to get vm from workload: %s", workload)
+				return ZDB{}, errors.Wrapf(err, "failed to get zdb from workload: %s", workload.Name)
 			}
 
 			result := NewZDBFromClientZDB(zdb)
