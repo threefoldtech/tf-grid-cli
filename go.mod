@@ -9,7 +9,7 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.2
 	github.com/threefoldtech/grid3-go v0.0.0-20230322122518-9548b74acf15
-	github.com/threefoldtech/grid_proxy_server v1.6.12
+	github.com/threefoldtech/grid_proxy_server v1.7.0
 	github.com/threefoldtech/zos v0.5.6-0.20230224113017-e887a6ca3fc5
 )
 
