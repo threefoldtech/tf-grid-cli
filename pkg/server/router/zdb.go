@@ -19,11 +19,11 @@ type ZDB struct {
 	Size        int    `json:"size"`
 	Description string `json:"description"`
 	Mode        string `json:"mode"`
-	Port        uint32 `json:"port"`
-	Namespace   string `json:"namespace"`
 
 	// computed
-	IPs []string `json:"ips"`
+	Port      uint32   `json:"port"`
+	Namespace string   `json:"namespace"`
+	IPs       []string `json:"ips"`
 }
 
 func (r *Router) ZDBDeploy(ctx context.Context, data string) (interface{}, error) {

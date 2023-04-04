@@ -49,5 +49,5 @@ func (r *Router) validateProjectName(ctx context.Context, projectName string) er
 }
 
 func generateProjectName(projectName string) string {
-	return fmt.Sprintf("%stfgridcli", projectName)
+	return fmt.Sprintf("%s.tfgrid.cli", projectName)
 }

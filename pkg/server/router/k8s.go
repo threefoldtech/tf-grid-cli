@@ -20,12 +20,6 @@ type K8sCluster struct {
 	Token       string    `json:"token"`
 	NetworkName string    `json:"network_name"`
 	SSHKey      string    `json:"ssh_key"`
-
-	//optional
-
-	//computed
-	NodeDeploymentID map[uint32]uint64          `json:"node_deployment_id"`
-	NodesIPRange     map[uint32]gridtypes.IPNet `json:"nodes_ip_range"`
 }
 
 // K8sNode kubernetes data
@@ -54,16 +48,12 @@ func (r *Router) K8sDeploy(ctx context.Context, data string) (interface{}, error
 		return K8sCluster{}, errors.Wrap(err, "failed to unmarshal k8sCluster model data")
 	}
 
-	originalProjectName := cluster.Name
-	cliProjectName := generateProjectName(cluster.Name)
-	cluster.Name = cliProjectName
+	projectName := generateProjectName(cluster.Name)
 
-	cluster, err := r.k8sDeploy(ctx, cluster)
+	cluster, err := r.k8sDeploy(ctx, cluster, projectName)
 	if err != nil {
 		return K8sCluster{}, errors.Wrap(err, "failed to deploy cluster")
 	}
-
-	cluster.Name = originalProjectName
 
 	return cluster, nil
 }
@@ -75,10 +65,9 @@ func (r *Router) K8sDelete(ctx context.Context, data string) (interface{}, error
 		return nil, errors.Wrap(err, "failed to unmarshal k8sCluster name")
 	}
 
-	cliProjectName := generateProjectName(clusterName)
-	clusterName = cliProjectName
+	projectName := generateProjectName(clusterName)
 
-	err := r.k8sDelete(ctx, clusterName)
+	err := r.k8sDelete(ctx, projectName)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to delete cluster")
 	}
@@ -86,35 +75,26 @@ func (r *Router) K8sDelete(ctx context.Context, data string) (interface{}, error
 	return nil, nil
 }
 
-// func K8sAddNode(ctx context.Context, client *deployer.TFPluginClient, data string) (string, error)
-
-// // func K8sRemoveNode(ctx context.Context, client *deployer.TFPluginClient, data string) (string, error)
-
 func (r *Router) K8sGet(ctx context.Context, data string) (interface{}, error) {
-	cluster := K8sCluster{}
 	var clusterName string
 
 	if err := json.Unmarshal([]byte(data), &clusterName); err != nil {
 		return K8sCluster{}, errors.Wrap(err, "failed to unmarshal k8sCluster name")
 	}
 
-	originalProjectName := cluster.Name
-	cliProjectName := generateProjectName(cluster.Name)
-	cluster.Name = cliProjectName
+	projectName := generateProjectName(clusterName)
 
-	cluster, err := r.k8sGet(ctx, clusterName)
+	cluster, err := r.k8sGet(ctx, clusterName, projectName)
 	if err != nil {
 		return K8sCluster{}, errors.Wrap(err, "failed to get cluster")
 	}
 
-	cluster.Name = originalProjectName
-
 	return cluster, nil
 }
 
-func (r *Router) k8sDeploy(ctx context.Context, cluster K8sCluster) (K8sCluster, error) {
+func (r *Router) k8sDeploy(ctx context.Context, cluster K8sCluster, projectName string) (K8sCluster, error) {
 	// validate project name is unique
-	if err := r.validateProjectName(ctx, cluster.Name); err != nil {
+	if err := r.validateProjectName(ctx, projectName); err != nil {
 		return K8sCluster{}, err
 	}
 
@@ -145,7 +125,7 @@ func (r *Router) k8sDeploy(ctx context.Context, cluster K8sCluster) (K8sCluster,
 		Name:         cluster.NetworkName,
 		Nodes:        nodeList,
 		IPRange:      ipRange,
-		SolutionType: cluster.Name,
+		SolutionType: projectName,
 	}
 
 	err = r.Client.NetworkDeployer.Deploy(ctx, &znet)
@@ -161,7 +141,7 @@ func (r *Router) k8sDeploy(ctx context.Context, cluster K8sCluster) (K8sCluster,
 	}
 
 	k8s := workloads.K8sCluster{
-		SolutionType: cluster.Name,
+		SolutionType: projectName,
 		NetworkName:  cluster.NetworkName,
 		Token:        cluster.Token,
 		SSHKey:       cluster.SSHKey,
@@ -175,10 +155,6 @@ func (r *Router) k8sDeploy(ctx context.Context, cluster K8sCluster) (K8sCluster,
 		return K8sCluster{}, errors.Wrapf(err, "Failed to deploy K8s Cluster")
 	}
 
-	// assign computed values to the result
-	cluster.NodeDeploymentID = k8s.NodeDeploymentID
-	cluster.NodesIPRange = k8s.NodesIPRange
-
 	cluster.Master.assignComputedNodeValues(*k8s.Master)
 	for idx := range k8s.Workers {
 		cluster.Workers[idx].assignComputedNodeValues(k8s.Workers[idx])
@@ -187,20 +163,24 @@ func (r *Router) k8sDeploy(ctx context.Context, cluster K8sCluster) (K8sCluster,
 	return cluster, nil
 }
 
-func (r *Router) k8sDelete(ctx context.Context, clusterName string) error {
-	err := r.Client.CancelByProjectName(clusterName)
+func (r *Router) k8sDelete(ctx context.Context, projectName string) error {
+	err := r.Client.CancelByProjectName(projectName)
 	if err != nil {
-		errors.Wrapf(err, "Failed to cancel cluster with name: %s", clusterName)
+		errors.Wrapf(err, "failed to cancel project: %s", projectName)
 	}
 
 	return nil
 }
 
-func (r *Router) k8sGet(ctx context.Context, clusterName string) (K8sCluster, error) {
+func (r *Router) k8sGet(ctx context.Context, clusterName string, projectName string) (K8sCluster, error) {
 	// get all contracts by project name
-	contracts, err := r.Client.ContractsGetter.ListContractsOfProjectName(clusterName)
+	contracts, err := r.Client.ContractsGetter.ListContractsOfProjectName(projectName)
 	if err != nil {
-		return K8sCluster{}, errors.Wrapf(err, "Found no clusters with this name: %s", clusterName)
+		return K8sCluster{}, errors.Wrapf(err, "failed to get contracts for project: %s", projectName)
+	}
+
+	if len(contracts.NodeContracts) == 0 {
+		return K8sCluster{}, fmt.Errorf("found 0 contracts for project %s", projectName)
 	}
 
 	result := K8sCluster{
@@ -214,13 +194,19 @@ func (r *Router) k8sGet(ctx context.Context, clusterName string) (K8sCluster, er
 
 	for _, contract := range contracts.NodeContracts {
 		nodeClient, err := r.Client.NcPool.GetNodeClient(r.Client.SubstrateConn, contract.NodeID)
+		if err != nil {
+			return K8sCluster{}, errors.Wrapf(err, "failed to get node %d client", contract.NodeID)
+		}
 
-		cid, err := strconv.ParseUint(contract.ContractID, 10, 64)
+		contractID, err := strconv.ParseUint(contract.ContractID, 10, 64)
 		if err != nil {
 			return K8sCluster{}, errors.Wrapf(err, "Couldn't convert ContractID: %s", contract.ContractID)
 		}
 
-		deployment, err := nodeClient.DeploymentGet(ctx, cid)
+		deployment, err := nodeClient.DeploymentGet(ctx, contractID)
+		if err != nil {
+			return K8sCluster{}, errors.Wrapf(err, "failed to get deployment with contract id %d", contractID)
+		}
 
 		for _, workload := range deployment.Workloads {
 			if workload.Type == zos.ZMachineType {
@@ -253,6 +239,7 @@ func (r *Router) k8sGet(ctx context.Context, clusterName string) (K8sCluster, er
 				if err != nil {
 					return K8sCluster{}, errors.Wrapf(err, "Failed to get disk from workload: %s", workload)
 				}
+
 				nodeName := diskNameNodeNameMap[disk.Name]
 				nodeNameDiskSizeMap[nodeName] = disk.SizeGB
 			}
@@ -263,6 +250,7 @@ func (r *Router) k8sGet(ctx context.Context, clusterName string) (K8sCluster, er
 	for idx := range result.Workers {
 		result.Workers[idx].DiskSize = nodeNameDiskSizeMap[result.Workers[idx].Name]
 	}
+
 	return result, nil
 }
 

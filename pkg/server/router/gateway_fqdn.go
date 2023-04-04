@@ -79,7 +79,7 @@ func (r *Router) GatewayFQDNDelete(ctx context.Context, data string) (interface{
 }
 
 func (r *Router) gatewayFQDNDeploy(ctx context.Context, gatewayFQDNModel GatewayFQDNModel, projectName string) (GatewayFQDNModel, error) {
-	if err := r.validateProjectName(ctx, gatewayFQDNModel.Name); err != nil {
+	if err := r.validateProjectName(ctx, projectName); err != nil {
 		return GatewayFQDNModel{}, err
 	}
 

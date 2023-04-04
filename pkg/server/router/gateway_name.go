@@ -82,7 +82,7 @@ func (r *Router) GatewayNameDelete(ctx context.Context, data string) (interface{
 
 func (r *Router) gatewayNameDeploy(ctx context.Context, gatewayNameModel GatewayNameModel, projectName string) (GatewayNameModel, error) {
 	// validate that no other project is deployed with this name
-	if err := r.validateProjectName(ctx, gatewayNameModel.Name); err != nil {
+	if err := r.validateProjectName(ctx, projectName); err != nil {
 		return GatewayNameModel{}, err
 	}
 
