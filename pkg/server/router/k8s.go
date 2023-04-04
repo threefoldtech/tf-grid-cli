@@ -222,11 +222,15 @@ func (r *Router) k8sGet(ctx context.Context, clusterName string, projectName str
 				}
 
 				if isWorker(vm) {
-					result.Workers = append(result.Workers, NewK8sNodeFromVM(vm))
+					worker := NewK8sNodeFromVM(vm)
+					worker.NodeID = contract.NodeID
+
+					result.Workers = append(result.Workers, worker)
 				} else {
 					masterNode := NewK8sNodeFromVM(vm)
-					result.Master = &masterNode
+					masterNode.NodeID = contract.NodeID
 
+					result.Master = &masterNode
 					result.SSHKey = vm.EnvVars["SSH_KEY"]
 					result.Token = vm.EnvVars["K3S_TOKEN"]
 				}

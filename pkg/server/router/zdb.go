@@ -3,6 +3,7 @@ package router
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -33,16 +34,12 @@ func (r *Router) ZDBDeploy(ctx context.Context, data string) (interface{}, error
 		return nil, errors.Wrap(err, "failed to unmarshal zdb model data")
 	}
 
-	originalProjectName := zdb.Name
-	cliProjectName := generateProjectName(zdb.Name)
-	zdb.Name = cliProjectName
+	projectName := generateProjectName(zdb.Name)
 
-	zdb, err := r.deployZDB(ctx, zdb)
+	zdb, err := r.deployZDB(ctx, zdb, projectName)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to deploy zdb")
 	}
-
-	zdb.Name = originalProjectName
 
 	return zdb, nil
 }
@@ -54,10 +51,9 @@ func (r *Router) ZDBDelete(ctx context.Context, data string) (interface{}, error
 		return nil, errors.Wrap(err, "failed to unmarshal zdb model data")
 	}
 
-	cliProjectName := generateProjectName(zdbName)
-	zdbName = cliProjectName
+	projectName := generateProjectName(zdbName)
 
-	err := r.deleteZDB(ctx, zdbName)
+	err := r.deleteZDB(ctx, projectName)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to delete zdb")
 	}
@@ -72,25 +68,19 @@ func (r *Router) ZDBGet(ctx context.Context, data string) (interface{}, error) {
 		return nil, errors.Wrap(err, "failed to unmarshal zdb model data")
 	}
 
-	originalProjectName := zdbName
-	cliProjectName := generateProjectName(zdbName)
-	zdbName = cliProjectName
+	projectName := generateProjectName(zdbName)
 
-	zdb, err := r.getZDB(ctx, zdbName)
+	zdb, err := r.getZDB(ctx, projectName)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get zdb")
 	}
 
-	zdb.Name = originalProjectName
-
 	return zdb, nil
 }
 
-///
-
-func (r *Router) deployZDB(ctx context.Context, zdb ZDB) (ZDB, error) {
+func (r *Router) deployZDB(ctx context.Context, zdb ZDB, projectName string) (ZDB, error) {
 	// validate no workloads with the same name
-	if err := r.validateProjectName(ctx, zdb.Name); err != nil {
+	if err := r.validateProjectName(ctx, projectName); err != nil {
 		return ZDB{}, err
 	}
 
@@ -100,15 +90,15 @@ func (r *Router) deployZDB(ctx context.Context, zdb ZDB) (ZDB, error) {
 	}
 	log.Info().Msgf("Deploying zdb: %+v", zdbs)
 
-	clientDeployment := workloads.NewDeployment(zdb.Name, zdb.NodeID, zdb.Name, nil, "", nil, zdbs, nil, nil)
+	clientDeployment := workloads.NewDeployment(zdb.Name, zdb.NodeID, projectName, nil, "", nil, zdbs, nil, nil)
 	err := r.Client.DeploymentDeployer.Deploy(ctx, &clientDeployment)
 	if err != nil {
 		return ZDB{}, errors.Wrapf(err, "failed to deploy zdb with name: %s", zdb.Name)
 	}
 
 	// get the result with the computed values
-	zdb_, err := r.Client.State.LoadZdbFromGrid(zdb.NodeID, zdb.Name, zdb.Name)
-	result := NewZDBFromClientZDB(zdb_)
+	loadedZDB, err := r.Client.State.LoadZdbFromGrid(zdb.NodeID, zdb.Name, zdb.Name)
+	result := NewZDBFromClientZDB(loadedZDB)
 	result.NodeID = zdb.NodeID
 
 	// NOTE: clean the state after deploying
@@ -125,46 +115,50 @@ func (r *Router) deleteZDB(ctx context.Context, name string) error {
 	return nil
 }
 
-func (r *Router) getZDB(ctx context.Context, name string) (ZDB, error) {
+func (r *Router) getZDB(ctx context.Context, projectName string) (ZDB, error) {
 	// get the contract
-	contracts, err := r.Client.ContractsGetter.ListContractsOfProjectName(name)
+	contracts, err := r.Client.ContractsGetter.ListContractsOfProjectName(projectName)
 	if err != nil {
-		return ZDB{}, errors.Wrapf(err, "Couldn't get contract for name: %s", name)
+		return ZDB{}, errors.Wrapf(err, "failed to get contracts for project: %s", projectName)
 	}
 
-	result := ZDB{}
-	for _, contract := range contracts.NodeContracts {
+	if len(contracts.NodeContracts) != 1 {
+		return ZDB{}, fmt.Errorf("contracts of project %s should be 1, but %d were found", projectName, len(contracts.NodeContracts))
+	}
 
-		cl, err := r.Client.NcPool.GetNodeClient(r.Client.SubstrateConn, contract.NodeID)
-		if err != nil {
-			return ZDB{}, errors.Wrapf(err, "Couldn't get client for node: %s", contract.NodeID)
-		}
+	contract := contracts.NodeContracts[0]
 
-		cid, err := strconv.ParseUint(contract.ContractID, 10, 64)
-		if err != nil {
-			return ZDB{}, errors.Wrapf(err, "Couldn't parse contract Id: %s", contract.ContractID)
-		}
+	cl, err := r.Client.NcPool.GetNodeClient(r.Client.SubstrateConn, contract.NodeID)
+	if err != nil {
+		return ZDB{}, errors.Wrapf(err, "failed to get client for node: %d", contract.NodeID)
+	}
 
-		dl, err := cl.DeploymentGet(ctx, cid)
-		if err != nil {
-			return ZDB{}, errors.Wrapf(err, "Couldn't get deployment for contract Id: %s", contract.ContractID)
-		}
+	cid, err := strconv.ParseUint(contract.ContractID, 10, 64)
+	if err != nil {
+		return ZDB{}, errors.Wrapf(err, "failed to parse contract Id: %s", contract.ContractID)
+	}
 
-		for _, workload := range dl.Workloads {
-			if workload.Type == zos.ZDBType {
-				zdb := workloads.ZDB{}
+	dl, err := cl.DeploymentGet(ctx, cid)
+	if err != nil {
+		return ZDB{}, errors.Wrapf(err, "failed to get deployment with contract Id: %s", contract.ContractID)
+	}
 
-				zdb, err = workloads.NewZDBFromWorkload(&workload)
-				if err != nil {
-					return ZDB{}, errors.Wrapf(err, "Failed to get vm from workload: %s", workload)
-				}
+	for _, workload := range dl.Workloads {
+		if workload.Type == zos.ZDBType {
+			zdb := workloads.ZDB{}
 
-				result = NewZDBFromClientZDB(zdb)
-				result.NodeID = contract.NodeID
+			zdb, err = workloads.NewZDBFromWorkload(&workload)
+			if err != nil {
+				return ZDB{}, errors.Wrapf(err, "Failed to get vm from workload: %s", workload)
 			}
+
+			result := NewZDBFromClientZDB(zdb)
+			result.NodeID = contract.NodeID
+			return result, nil
 		}
 	}
-	return result, nil
+
+	return ZDB{}, fmt.Errorf("found zdb workloads in contract %d", contract.NodeID)
 }
 
 func NewClientWorkloadFromZDB(zdb ZDB) workloads.ZDB {

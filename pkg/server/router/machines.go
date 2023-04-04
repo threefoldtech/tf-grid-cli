@@ -17,14 +17,11 @@ import (
 
 // Machines model ensures that each node has one deployment that includes all workloads
 type MachinesModel struct {
-	Name        string    `json:"name"`     // this is the project name, should be unique
+	Name        string    `json:"name"`     // this is the model name, should be unique
 	Network     Network   `json:"network"`  // network specs
 	Machines    []Machine `json:"machines"` // machines specs
 	Metadata    string    `json:"metadata"`
 	Description string    `json:"description"`
-
-	// computed
-	// NodeDeploymentID map[uint32]uint64
 }
 
 type Network struct {
@@ -126,16 +123,12 @@ func (r *Router) MachinesDeploy(ctx context.Context, data string) (interface{}, 
 		return nil, errors.Wrap(err, "failed to unmarshal machine model data")
 	}
 
-	originalProjectName := model.Name
-	cliProjectName := generateProjectName(model.Name)
-	model.Name = cliProjectName
+	projectName := generateProjectName(model.Name)
 
-	model, err := r.machinesDeploy(ctx, model)
+	model, err := r.machinesDeploy(ctx, model, projectName)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to deploy model")
 	}
-
-	model.Name = originalProjectName
 
 	return model, nil
 }
@@ -147,11 +140,10 @@ func (r *Router) MachinesDelete(ctx context.Context, data string) (interface{}, 
 		return nil, errors.Wrap(err, "failed to unmarshal model name")
 	}
 
-	cliProjectName := generateProjectName(modelName)
-	modelName = cliProjectName
+	projectName := generateProjectName(modelName)
 
-	log.Info().Msgf("cancelilng project %s", modelName)
-	if err := r.machinesDelete(ctx, modelName); err != nil {
+	log.Info().Msgf("cancelilng project %s", projectName)
+	if err := r.machinesDelete(ctx, projectName); err != nil {
 		return nil, errors.Wrapf(err, "failed to delete model %s", modelName)
 	}
 
@@ -165,23 +157,19 @@ func (r *Router) MachinesGet(ctx context.Context, data string) (interface{}, err
 		return nil, errors.Wrap(err, "failed to unmarshal model name")
 	}
 
-	originalProjectName := modelName
-	cliProjectName := generateProjectName(modelName)
-	modelName = cliProjectName
+	projectName := generateProjectName(modelName)
 
-	log.Info().Msgf("getting project %s", modelName)
-	model, err := r.machinesGet(ctx, modelName)
+	log.Info().Msgf("getting project %s", projectName)
+	model, err := r.machinesGet(ctx, modelName, projectName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get model %s", modelName)
 	}
-
-	model.Name = originalProjectName
 
 	return model, nil
 }
 
 // nodes should always be provided
-func (r *Router) machinesDeploy(ctx context.Context, model MachinesModel) (MachinesModel, error) {
+func (r *Router) machinesDeploy(ctx context.Context, model MachinesModel, projectName string) (MachinesModel, error) {
 	/*
 		- validate incoming deployment
 			- project name has to be unique
@@ -195,33 +183,41 @@ func (r *Router) machinesDeploy(ctx context.Context, model MachinesModel) (Machi
 	*/
 
 	// validation
-	if err := r.validateProjectName(ctx, model.Name); err != nil {
+	if err := r.validateProjectName(ctx, projectName); err != nil {
 		return MachinesModel{}, err
 	}
 
 	// TODO: if machines don't have nodes assigned, should be assigned here
 
 	// deploy network
-	znet, err := r.deployNetwork(ctx, &model)
+	znet, err := r.deployMahchinesNetwork(ctx, &model, projectName)
 	if err != nil {
 		return MachinesModel{}, err
 	}
 
 	// deploy deployment
-	if err := r.deployDeployment(ctx, &model); err != nil {
+	if err := r.deployMachinesWorkloads(ctx, &model, projectName); err != nil {
 		// TODO: if error happens midway, all created contracts should be deleted
 		return MachinesModel{}, err
 	}
 
 	// construct result
-	if err := r.constructResult(&model, znet); err != nil {
+	if err := r.constructMachinesResult(&model, znet); err != nil {
 		return MachinesModel{}, err
 	}
 
 	return model, nil
 }
 
-func (r *Router) constructResult(model *MachinesModel, znet *workloads.ZNet) error {
+func (m *MachinesModel) generateDiskNames() {
+	for _, machine := range m.Machines {
+		for idx := range machine.Disks {
+			machine.Disks[idx].Name = fmt.Sprintf("%s_disk_%d", machine.Name, idx)
+		}
+	}
+}
+
+func (r *Router) constructMachinesResult(model *MachinesModel, znet *workloads.ZNet) error {
 	model.Network.WireguardConfig = znet.AccessWGConfig
 
 	for idx, m := range model.Machines {
@@ -248,7 +244,9 @@ func (r *Router) constructResult(model *MachinesModel, znet *workloads.ZNet) err
 	return nil
 }
 
-func (r *Router) deployDeployment(ctx context.Context, model *MachinesModel) error {
+func (r *Router) deployMachinesWorkloads(ctx context.Context, model *MachinesModel, projectName string) error {
+	model.generateDiskNames()
+
 	nodeMachineMap := map[uint32][]*Machine{}
 	for idx, machine := range model.Machines {
 		nodeMachineMap[machine.NodeID] = append(nodeMachineMap[machine.NodeID], &model.Machines[idx])
@@ -268,7 +266,7 @@ func (r *Router) deployDeployment(ctx context.Context, model *MachinesModel) err
 			disks = append(disks, nodeDisks...)
 		}
 
-		clientDeployment := workloads.NewDeployment(model.Name, nodeID, model.Name, nil, networkName, disks, nil, vms, QSFSs)
+		clientDeployment := workloads.NewDeployment(model.Name, nodeID, projectName, nil, networkName, disks, nil, vms, QSFSs)
 		if err := r.Client.DeploymentDeployer.Deploy(ctx, &clientDeployment); err != nil {
 			return errors.Wrap(err, "failed to deploy")
 		}
@@ -277,7 +275,7 @@ func (r *Router) deployDeployment(ctx context.Context, model *MachinesModel) err
 	return nil
 }
 
-func (r *Router) deployNetwork(ctx context.Context, model *MachinesModel) (*workloads.ZNet, error) {
+func (r *Router) deployMahchinesNetwork(ctx context.Context, model *MachinesModel, projectName string) (*workloads.ZNet, error) {
 	nodeList := []uint32{}
 	nodeSet := map[uint32]struct{}{}
 	for _, machine := range model.Machines {
@@ -297,7 +295,7 @@ func (r *Router) deployNetwork(ctx context.Context, model *MachinesModel) (*work
 		Nodes:        nodeList,
 		IPRange:      ipRange,
 		AddWGAccess:  model.Network.AddWireguardAccess,
-		SolutionType: model.Name,
+		SolutionType: projectName,
 	}
 
 	if znet.AddWGAccess == true {
@@ -408,22 +406,27 @@ func (r *Router) extractWorkloads(machine *Machine, networkName string) (workloa
 	return vm, disks, qsfss
 }
 
-func (r *Router) machinesDelete(ctx context.Context, name string) error {
-	if err := r.Client.CancelByProjectName(name); err != nil {
+func (r *Router) machinesDelete(ctx context.Context, projectName string) error {
+	if err := r.Client.CancelByProjectName(projectName); err != nil {
 		return errors.Wrapf(err, "failed to cancel contracts")
 	}
 
 	return nil
 }
 
-func (r *Router) machinesGet(ctx context.Context, name string) (MachinesModel, error) {
+func (r *Router) machinesGet(ctx context.Context, modelName string, projectName string) (MachinesModel, error) {
+	contracts, err := r.Client.ContractsGetter.ListContractsOfProjectName(projectName)
+	if err != nil {
+		return MachinesModel{}, errors.Wrapf(err, "failed to retreive contracts with project name %s", projectName)
+	}
+
+	if len(contracts.NodeContracts) == 0 {
+		return MachinesModel{}, fmt.Errorf("found 0 contracts for project %s", projectName)
+	}
+
 	model := MachinesModel{}
 
-	contracts, err := r.Client.ContractsGetter.ListContractsOfProjectName(name)
-	if err != nil {
-		return MachinesModel{}, errors.Wrapf(err, "failed to retreive contracts with project name %s", name)
-	}
-	networkName := fmt.Sprintf("%s.network", name)
+	networkName := fmt.Sprintf("%s.network", modelName)
 
 	model.Network = Network{
 		Name: networkName,
@@ -446,7 +449,7 @@ func (r *Router) machinesGet(ctx context.Context, name string) (MachinesModel, e
 		}
 
 		machineMap := map[string]*Machine{}
-		diskMountPoints := map[string]string{}
+		machineMountPoints := map[string]string{}
 		// first get machines and znet
 		for idx := range dl.Workloads {
 			if dl.Workloads[idx].Type == zos.ZMachineType {
@@ -454,19 +457,22 @@ func (r *Router) machinesGet(ctx context.Context, name string) (MachinesModel, e
 				if err != nil {
 					return MachinesModel{}, errors.Wrapf(err, "failed to parse vm %s data", dl.Workloads[idx].Name)
 				}
-				machine := r.machineFromVM(&vm)
+
+				machine := machineFromVM(&vm)
+				machine.NodeID = c.NodeID
 				machineMap[machine.Name] = &machine
+
 				for _, mp := range vm.Mounts {
-					diskMountPoints[mp.DiskName] = mp.MountPoint
+					machineMountPoints[mp.DiskName] = mp.MountPoint
 				}
 			}
+
 			if dl.Workloads[idx].Type == zos.NetworkType && model.Network.IPRange == "" {
 				net, err := workloads.NewNetworkFromWorkload(dl.Workloads[idx], c.NodeID)
 				if err != nil {
 					return MachinesModel{}, errors.Wrapf(err, "failed to parse network %s data", dl.Workloads[idx].Name)
 				}
 
-				model.Network.AddWireguardAccess = net.AddWGAccess
 				model.Network.IPRange = net.IPRange.String()
 			}
 		}
@@ -478,7 +484,8 @@ func (r *Router) machinesGet(ctx context.Context, name string) (MachinesModel, e
 				if err != nil {
 					return MachinesModel{}, errors.Wrapf(err, "failed to parse disk %s data", dl.Workloads[idx].Name)
 				}
-				machineName, err := r.getMachineName(disk.Name)
+
+				machineName, err := getMachineNameFromMount(disk.Name)
 				if err != nil {
 					return MachinesModel{}, errors.Wrapf(err, "failed to extract machine name from disk with name %s", disk.Name)
 				}
@@ -492,7 +499,7 @@ func (r *Router) machinesGet(ctx context.Context, name string) (MachinesModel, e
 					Name:        disk.Name,
 					SizeGB:      disk.SizeGB,
 					Description: disk.Description,
-					MountPoint:  diskMountPoints[disk.Name],
+					MountPoint:  machineMountPoints[disk.Name],
 				})
 			} else if dl.Workloads[idx].Type == zos.QuantumSafeFSType {
 				qsfs, err := workloads.NewQSFSFromWorkload(&dl.Workloads[idx])
@@ -500,7 +507,7 @@ func (r *Router) machinesGet(ctx context.Context, name string) (MachinesModel, e
 					return MachinesModel{}, errors.Wrapf(err, "failed to parse qsfs %s data", qsfs.Name)
 				}
 
-				machineName, err := r.getMachineName(qsfs.Name)
+				machineName, err := getMachineNameFromMount(qsfs.Name)
 				if err != nil {
 					return MachinesModel{}, errors.Wrapf(err, "failed to extract machine name from qsfs with name %s", qsfs.Name)
 				}
@@ -533,7 +540,7 @@ func (r *Router) machinesGet(ctx context.Context, name string) (MachinesModel, e
 				}
 
 				machine.QSFSs = append(machine.QSFSs, QSFS{
-					MountPoint:           "",
+					MountPoint:           machineMountPoints[machineName],
 					Description:          qsfs.Description,
 					Cache:                qsfs.Cache,
 					MinimalShards:        qsfs.MinimalShards,
@@ -567,12 +574,12 @@ func (r *Router) machinesGet(ctx context.Context, name string) (MachinesModel, e
 		model.Machines = append(model.Machines, machines...)
 	}
 
-	model.Name = name
+	model.Name = modelName
 
 	return model, nil
 }
 
-func (r *Router) getMachineName(name string) (string, error) {
+func getMachineNameFromMount(name string) (string, error) {
 	// disk or qsfs name should be in the form: vmname_disk/qsfs_X
 	s := strings.Split(name, "_")
 	if len(s) == 0 {
@@ -581,7 +588,7 @@ func (r *Router) getMachineName(name string) (string, error) {
 	return s[0], nil
 }
 
-func (r *Router) machineFromVM(vm *workloads.VM) Machine {
+func machineFromVM(vm *workloads.VM) Machine {
 	zlogs := []Zlog{}
 	for _, zlog := range vm.Zlogs {
 		zlogs = append(zlogs, Zlog{
