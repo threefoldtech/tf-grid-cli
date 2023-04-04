@@ -7,7 +7,7 @@ import (
 	server "github.com/threefoldtech/tf-grid-cli/pkg/server"
 )
 
-func RPCServer() error {
+func TFGridServer() error {
 	server, err := server.NewServer()
 	if err != nil {
 		return errors.Wrap(err, "failed to create new rpc server")

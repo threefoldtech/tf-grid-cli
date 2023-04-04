@@ -127,9 +127,10 @@ func (s *Server) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			res, err := redis.ByteSlices(con.Do("BRPOP", "tfgrid.client", 0))
+			res, err := redis.ByteSlices(con.Do("BRPOP", "tfgrid.client", 10))
 			if err != nil {
-				return errors.Wrap(err, "failted to read from redis")
+				log.Debug().Msgf("redis BRPOP timeout expired. retrying...")
+				continue
 			}
 
 			go s.process(ctx, res[1])

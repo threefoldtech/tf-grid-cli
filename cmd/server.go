@@ -11,7 +11,7 @@ var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: "Run an rpc server listening for incoming commands to the tfgrid client",
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := command.RPCServer(); err != nil {
+		if err := command.TFGridServer(); err != nil {
 			log.Fatal().Err(err).Send()
 		}
 	},
@@ -39,7 +39,7 @@ var daemonCmd = &cobra.Command{
 			_ = ctx.Release()
 		}()
 
-		if err := command.RPCServer(); err != nil {
+		if err := command.TFGridServer(); err != nil {
 			log.Fatal().Err(err).Send()
 		}
 	},
