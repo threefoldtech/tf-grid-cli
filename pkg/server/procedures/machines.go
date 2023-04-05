@@ -10,6 +10,7 @@ import (
 	"github.com/threefoldtech/grid3-go/deployer"
 	"github.com/threefoldtech/grid3-go/workloads"
 	"github.com/threefoldtech/tf-grid-cli/pkg/server/types"
+	"github.com/threefoldtech/tf-grid-cli/pkg/server/utils"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -40,6 +41,10 @@ func MachinesDeploy(ctx context.Context, model types.MachinesModel, client *depl
 	}
 
 	// TODO: if machines don't have nodes assigned, should be assigned here
+	err = utils.AssignNodesIDsForMachines(client, &model)
+	if err != nil {
+		return types.MachinesModel{}, errors.Wrapf(err, "Couldn't find node for all machines model")
+	}
 
 	// deploy network
 	znet, err := deployNetwork(ctx, &model, client)
