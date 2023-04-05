@@ -11,6 +11,7 @@ import (
 	"github.com/threefoldtech/grid3-go/deployer"
 	"github.com/threefoldtech/grid3-go/workloads"
 	"github.com/threefoldtech/tf-grid-cli/pkg/server/types"
+	"github.com/threefoldtech/tf-grid-cli/pkg/server/utils"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
 
@@ -23,6 +24,16 @@ func ZDBDeploy(ctx context.Context, zdb types.ZDB, client *deployer.TFPluginClie
 
 	if len(contracts.NameContracts) > 0 || len(contracts.NodeContracts) > 0 || len(contracts.RentContracts) > 0 {
 		return types.ZDB{}, fmt.Errorf("there is a zdb with the same name: %s", zdb.Name)
+	}
+
+	// capacity filter
+	if zdb.NodeID == 0 {
+		nodeId, err := utils.GetNodeForZdb(client, uint64(zdb.Size))
+		if err != nil {
+			return types.ZDB{}, errors.Wrapf(err, "Couldn't find a gateway node")
+		}
+
+		zdb.NodeID = nodeId
 	}
 
 	// deploy

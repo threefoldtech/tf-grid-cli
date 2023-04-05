@@ -9,12 +9,22 @@ import (
 	"github.com/threefoldtech/grid3-go/graphql"
 	"github.com/threefoldtech/grid3-go/workloads"
 	"github.com/threefoldtech/tf-grid-cli/pkg/server/types"
+	"github.com/threefoldtech/tf-grid-cli/pkg/server/utils"
 )
 
 func GatewayNameDeploy(ctx context.Context, gatewayNameModel types.GatewayNameModel, client *deployer.TFPluginClient) (types.GatewayNameModel, error) {
 	// validate that no other project is deployed with this name
 	if err := validateProjectName(ctx, gatewayNameModel.Name, client); err != nil {
 		return types.GatewayNameModel{}, errors.Wrapf(err, "project name is not unique")
+	}
+
+	if gatewayNameModel.NodeID == 0 {
+		nodeId, err := utils.GetGatewayNode(client)
+		if err != nil {
+			return types.GatewayNameModel{}, errors.Wrapf(err, "Couldn't find a gateway node")
+		}
+
+		gatewayNameModel.NodeID = nodeId
 	}
 
 	// deploy gateway
@@ -161,6 +171,16 @@ func GatewayNameGet(ctx context.Context, name string, client *deployer.TFPluginC
 func GatewayFQDNDeploy(ctx context.Context, gatewayFQDNModel types.GatewayFQDNModel, client *deployer.TFPluginClient) (types.GatewayFQDNModel, error) {
 	if err := validateProjectName(ctx, gatewayFQDNModel.Name, client); err != nil {
 		return types.GatewayFQDNModel{}, err
+	}
+
+	if gatewayFQDNModel.NodeID == 0 {
+		nodeId, err := utils.GetGatewayNode(client)
+
+		if err != nil {
+			return types.GatewayFQDNModel{}, errors.Wrapf(err, "Couldn't find a gateway node")
+		}
+
+		gatewayFQDNModel.NodeID = nodeId
 	}
 
 	gatewayFQDN := workloads.GatewayFQDNProxy{

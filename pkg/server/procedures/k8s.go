@@ -10,6 +10,7 @@ import (
 	"github.com/threefoldtech/grid3-go/deployer"
 	"github.com/threefoldtech/grid3-go/workloads"
 	"github.com/threefoldtech/tf-grid-cli/pkg/server/types"
+	"github.com/threefoldtech/tf-grid-cli/pkg/server/utils"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
@@ -23,6 +24,11 @@ func K8sDeploy(ctx context.Context, cluster types.K8sCluster, client *deployer.T
 
 	if len(contracts.NameContracts) > 0 || len(contracts.NodeContracts) > 0 || len(contracts.RentContracts) > 0 {
 		return types.K8sCluster{}, fmt.Errorf("You have a cluster with the same name: %s", cluster.Name)
+	}
+
+	err = utils.AssignNodesIDsForCluster(client, &cluster)
+	if err != nil {
+		return types.K8sCluster{}, errors.Wrapf(err, "Couldn't find node for all cluster nodes")
 	}
 
 	// deploy network
