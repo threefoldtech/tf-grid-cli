@@ -91,15 +91,29 @@ func (r *Router) deployZDB(ctx context.Context, zdb ZDB, projectName string) (ZD
 	log.Info().Msgf("Deploying zdb: %+v", zdbs)
 
 	clientDeployment := workloads.NewDeployment(zdb.Name, zdb.NodeID, projectName, nil, "", nil, zdbs, nil, nil)
-	err := r.Client.DeploymentDeployer.Deploy(ctx, &clientDeployment)
+	resDeployment, err := r.client.DeployDeployment(ctx, &clientDeployment)
 	if err != nil {
 		return ZDB{}, errors.Wrapf(err, "failed to deploy zdb with name: %s", zdb.Name)
 	}
 
 	// get the result with the computed values
-	loadedZDB, err := r.Client.State.LoadZdbFromGrid(zdb.NodeID, zdb.Name, zdb.Name)
+	nodeClient, err := r.client.GetNodeClient(zdb.NodeID)
 	if err != nil {
-		return ZDB{}, errors.Wrapf(err, "failed to load zdb %s", zdb.Name)
+		return ZDB{}, err
+	}
+
+	dl, err := nodeClient.DeploymentGet(ctx, resDeployment.ContractID)
+	if err != nil {
+		return ZDB{}, errors.Wrapf(err, "failed to retreive deployment with contract id %d", resDeployment.ContractID)
+	}
+
+	if len(dl.Workloads) != 1 {
+		return ZDB{}, errors.Wrapf(err, "deployment %d should have 1 workload, but %d were found", resDeployment.ContractID, len(dl.Workloads))
+	}
+
+	loadedZDB, err := workloads.NewZDBFromWorkload(&dl.Workloads[0])
+	if err != nil {
+		return ZDB{}, errors.Wrapf(err, "failed to construct zdb from workload")
 	}
 
 	result := NewZDBFromClientZDB(loadedZDB)
@@ -109,11 +123,10 @@ func (r *Router) deployZDB(ctx context.Context, zdb ZDB, projectName string) (ZD
 	return result, nil
 }
 
-func (r *Router) deleteZDB(ctx context.Context, name string) error {
+func (r *Router) deleteZDB(ctx context.Context, projectName string) error {
 	// TODO: fix canceling
-	err := r.Client.CancelByProjectName(name)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to cancel cluster with name: %s", name)
+	if err := r.client.CancelProject(ctx, projectName); err != nil {
+		return errors.Wrapf(err, "Failed to cancel cluster with name: %s", projectName)
 	}
 
 	return nil
@@ -121,7 +134,7 @@ func (r *Router) deleteZDB(ctx context.Context, name string) error {
 
 func (r *Router) getZDB(ctx context.Context, projectName string) (ZDB, error) {
 	// get the contract
-	contracts, err := r.Client.ContractsGetter.ListContractsOfProjectName(projectName)
+	contracts, err := r.client.GetProjectContracts(ctx, projectName)
 	if err != nil {
 		return ZDB{}, errors.Wrapf(err, "failed to get contracts for project: %s", projectName)
 	}
@@ -132,7 +145,7 @@ func (r *Router) getZDB(ctx context.Context, projectName string) (ZDB, error) {
 
 	contract := contracts.NodeContracts[0]
 
-	cl, err := r.Client.NcPool.GetNodeClient(r.Client.SubstrateConn, contract.NodeID)
+	cl, err := r.client.GetNodeClient(contract.NodeID)
 	if err != nil {
 		return ZDB{}, errors.Wrapf(err, "failed to get client for node: %d", contract.NodeID)
 	}

@@ -27,6 +27,6 @@ func (r *Router) Login(ctx context.Context, data string) (interface{}, error) {
 		return deployer.TFPluginClient{}, errors.Wrap(err, "failed to get tf plugin client")
 	}
 
-	r.Client = &newClient
+	r.client = NewTFGridClient(&newClient)
 	return nil, nil
 }

@@ -196,17 +196,26 @@ func (r *Router) machinesDeploy(ctx context.Context, model MachinesModel, projec
 	}
 
 	// deploy deployment
-	if err := r.deployMachinesWorkloads(ctx, &model, projectName); err != nil {
+	nodeDeploymentID, err := r.deployMachinesWorkloads(ctx, &model, projectName)
+	if err != nil {
 		// TODO: if error happens midway, all created contracts should be deleted
 		return MachinesModel{}, err
 	}
 
+	net := Network{
+		Name:               znet.Name,
+		AddWireguardAccess: znet.AddWGAccess,
+		IPRange:            znet.IPRange.String(),
+		WireguardConfig:    znet.AccessWGConfig,
+	}
+
 	// construct result
-	if err := r.constructMachinesResult(&model, znet); err != nil {
+	resModel, err := r.constructMachinesModelFromContracts(ctx, nodeDeploymentID, model.Name, net)
+	if err != nil {
 		return MachinesModel{}, err
 	}
 
-	return model, nil
+	return resModel, nil
 }
 
 func (m *MachinesModel) generateDiskNames() {
@@ -217,34 +226,35 @@ func (m *MachinesModel) generateDiskNames() {
 	}
 }
 
-func (r *Router) constructMachinesResult(model *MachinesModel, znet *workloads.ZNet) error {
-	model.Network.WireguardConfig = znet.AccessWGConfig
+// func (r *Router) constructMachinesResult(model *MachinesModel, znet *workloads.ZNet) error {
+// 	model.Network.WireguardConfig = znet.AccessWGConfig
 
-	for idx, m := range model.Machines {
-		vm, err := r.Client.State.LoadVMFromGrid(m.NodeID, m.Name, model.Name)
-		if err != nil {
-			return errors.Wrap(err, "deployment was successful, but failed to construct result")
-		}
+// 	for idx, m := range model.Machines {
+// 		workloads.NewVMFromWorkload()
+// 		vm, err := r.Client.State.LoadVMFromGrid(m.NodeID, m.Name, model.Name)
+// 		if err != nil {
+// 			return errors.Wrap(err, "deployment was successful, but failed to construct result")
+// 		}
 
-		// get machine ips
-		model.Machines[idx].ComputedIP4 = vm.ComputedIP
-		model.Machines[idx].ComputedIP6 = vm.ComputedIP6
-		model.Machines[idx].YggIP = vm.YggIP
-		model.Machines[idx].WGIP = vm.IP
+// 		// get machine ips
+// 		model.Machines[idx].ComputedIP4 = vm.ComputedIP
+// 		model.Machines[idx].ComputedIP6 = vm.ComputedIP6
+// 		model.Machines[idx].YggIP = vm.YggIP
+// 		model.Machines[idx].WGIP = vm.IP
 
-		for idy, qsfs := range model.Machines[idx].QSFSs {
-			q, err := r.Client.State.LoadQSFSFromGrid(m.NodeID, qsfs.Name, model.Name)
-			if err != nil {
-				return errors.Wrap(err, "deployment was successful, but failed to construct result")
-			}
-			model.Machines[idx].QSFSs[idy].MetricsEndpoint = q.MetricsEndpoint
-		}
-	}
+// 		for idy, qsfs := range model.Machines[idx].QSFSs {
+// 			q, err := r.Client.State.LoadQSFSFromGrid(m.NodeID, qsfs.Name, model.Name)
+// 			if err != nil {
+// 				return errors.Wrap(err, "deployment was successful, but failed to construct result")
+// 			}
+// 			model.Machines[idx].QSFSs[idy].MetricsEndpoint = q.MetricsEndpoint
+// 		}
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
-func (r *Router) deployMachinesWorkloads(ctx context.Context, model *MachinesModel, projectName string) error {
+func (r *Router) deployMachinesWorkloads(ctx context.Context, model *MachinesModel, projectName string) (map[uint32]uint64, error) {
 	model.generateDiskNames()
 
 	nodeMachineMap := map[uint32][]*Machine{}
@@ -252,7 +262,9 @@ func (r *Router) deployMachinesWorkloads(ctx context.Context, model *MachinesMod
 		nodeMachineMap[machine.NodeID] = append(nodeMachineMap[machine.NodeID], &model.Machines[idx])
 	}
 
-	networkName := fmt.Sprintf("%s_network", model.Name)
+	nodeDeploymentID := map[uint32]uint64{}
+
+	networkName := generateNetworkName(model.Name)
 
 	for nodeID, machines := range nodeMachineMap {
 		vms := []workloads.VM{}
@@ -267,12 +279,15 @@ func (r *Router) deployMachinesWorkloads(ctx context.Context, model *MachinesMod
 		}
 
 		clientDeployment := workloads.NewDeployment(model.Name, nodeID, projectName, nil, networkName, disks, nil, vms, QSFSs)
-		if err := r.Client.DeploymentDeployer.Deploy(ctx, &clientDeployment); err != nil {
-			return errors.Wrap(err, "failed to deploy")
+		dl, err := r.client.DeployDeployment(ctx, &clientDeployment)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to deploy")
 		}
+
+		nodeDeploymentID[nodeID] = dl.ContractID
 	}
 
-	return nil
+	return nodeDeploymentID, nil
 }
 
 func (r *Router) deployMahchinesNetwork(ctx context.Context, model *MachinesModel, projectName string) (*workloads.ZNet, error) {
@@ -291,7 +306,7 @@ func (r *Router) deployMahchinesNetwork(ctx context.Context, model *MachinesMode
 	}
 
 	znet := workloads.ZNet{
-		Name:         fmt.Sprintf("%s_network", model.Name),
+		Name:         generateNetworkName(model.Name),
 		Nodes:        nodeList,
 		IPRange:      ipRange,
 		AddWGAccess:  model.Network.AddWireguardAccess,
@@ -306,12 +321,12 @@ func (r *Router) deployMahchinesNetwork(ctx context.Context, model *MachinesMode
 		znet.ExternalSK = privateKey
 	}
 
-	err = r.Client.NetworkDeployer.Deploy(ctx, &znet)
+	resNet, err := r.client.DeployNetwork(ctx, &znet)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to deploy network")
 	}
 
-	return &znet, nil
+	return resNet, nil
 }
 
 func (r *Router) extractWorkloads(machine *Machine, networkName string) (workloads.VM, []workloads.Disk, []workloads.QSFS) {
@@ -407,7 +422,7 @@ func (r *Router) extractWorkloads(machine *Machine, networkName string) (workloa
 }
 
 func (r *Router) machinesDelete(ctx context.Context, projectName string) error {
-	if err := r.Client.CancelByProjectName(projectName); err != nil {
+	if err := r.client.CancelProject(ctx, projectName); err != nil {
 		return errors.Wrapf(err, "failed to cancel contracts")
 	}
 
@@ -415,7 +430,7 @@ func (r *Router) machinesDelete(ctx context.Context, projectName string) error {
 }
 
 func (r *Router) machinesGet(ctx context.Context, modelName string, projectName string) (MachinesModel, error) {
-	contracts, err := r.Client.ContractsGetter.ListContractsOfProjectName(projectName)
+	contracts, err := r.client.GetProjectContracts(ctx, projectName)
 	if err != nil {
 		return MachinesModel{}, errors.Wrapf(err, "failed to retreive contracts with project name %s", projectName)
 	}
@@ -424,26 +439,39 @@ func (r *Router) machinesGet(ctx context.Context, modelName string, projectName 
 		return MachinesModel{}, fmt.Errorf("found 0 contracts for project %s", projectName)
 	}
 
-	model := MachinesModel{}
-
-	networkName := fmt.Sprintf("%s.network", modelName)
-
-	model.Network = Network{
-		Name: networkName,
-	}
-
+	nodeDeploymentID := map[uint32]uint64{}
 	for _, c := range contracts.NodeContracts {
 		contractID, err := strconv.Atoi(c.ContractID)
 		if err != nil {
 			return MachinesModel{}, errors.Wrapf(err, "failed to parse contract with id (%s)", c.ContractID)
 		}
+		nodeDeploymentID[c.NodeID] = uint64(contractID)
+	}
+	net := Network{
+		Name: generateNetworkName(modelName),
+	}
 
-		nodeClient, err := r.Client.NcPool.GetNodeClient(r.Client.SubstrateConn, c.NodeID)
+	model, err := r.constructMachinesModelFromContracts(ctx, nodeDeploymentID, modelName, net)
+	if err != nil {
+		return MachinesModel{}, errors.Wrapf(err, "failed to construct model for project")
+	}
+
+	return model, nil
+}
+
+func (r *Router) constructMachinesModelFromContracts(ctx context.Context, nodeDeploymentID map[uint32]uint64, modelName string, net Network) (MachinesModel, error) {
+	model := MachinesModel{
+		Name:    modelName,
+		Network: net,
+	}
+	for nodeID, contractID := range nodeDeploymentID {
+
+		nodeClient, err := r.client.GetNodeClient(nodeID)
 		if err != nil {
-			return MachinesModel{}, errors.Wrapf(err, "failed to get node %d client", c.NodeID)
+			return MachinesModel{}, errors.Wrapf(err, "failed to get node %d client", nodeID)
 		}
 
-		dl, err := nodeClient.DeploymentGet(ctx, uint64(contractID))
+		dl, err := nodeClient.DeploymentGet(ctx, contractID)
 		if err != nil {
 			return MachinesModel{}, errors.Wrapf(err, "failed to get deployment with contract id %d", contractID)
 		}
@@ -459,7 +487,7 @@ func (r *Router) machinesGet(ctx context.Context, modelName string, projectName 
 				}
 
 				machine := machineFromVM(&vm)
-				machine.NodeID = c.NodeID
+				machine.NodeID = nodeID
 				machineMap[machine.Name] = &machine
 
 				for _, mp := range vm.Mounts {
@@ -468,7 +496,7 @@ func (r *Router) machinesGet(ctx context.Context, modelName string, projectName 
 			}
 
 			if dl.Workloads[idx].Type == zos.NetworkType && model.Network.IPRange == "" {
-				net, err := workloads.NewNetworkFromWorkload(dl.Workloads[idx], c.NodeID)
+				net, err := workloads.NewNetworkFromWorkload(dl.Workloads[idx], nodeID)
 				if err != nil {
 					return MachinesModel{}, errors.Wrapf(err, "failed to parse network %s data", dl.Workloads[idx].Name)
 				}
@@ -574,8 +602,6 @@ func (r *Router) machinesGet(ctx context.Context, modelName string, projectName 
 		model.Machines = append(model.Machines, machines...)
 	}
 
-	model.Name = modelName
-
 	return model, nil
 }
 
@@ -615,4 +641,8 @@ func machineFromVM(vm *workloads.VM) Machine {
 		Zlogs:       zlogs,
 	}
 	return machine
+}
+
+func generateNetworkName(modelName string) string {
+	return fmt.Sprintf("%s_network", modelName)
 }

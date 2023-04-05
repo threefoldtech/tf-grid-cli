@@ -96,11 +96,12 @@ func (r *Router) gatewayNameDeploy(ctx context.Context, gatewayNameModel Gateway
 		SolutionType:   projectName,
 	}
 
-	if err := r.Client.GatewayNameDeployer.Deploy(ctx, &gateway); err != nil {
+	gw, err := r.client.DeployGWName(ctx, &gateway)
+	if err != nil {
 		return GatewayNameModel{}, errors.Wrapf(err, "failed to deploy gateway %s", gateway.Name)
 	}
 
-	nodeClient, err := r.Client.NcPool.GetNodeClient(r.Client.SubstrateConn, gateway.NodeID)
+	nodeClient, err := r.client.GetNodeClient(gw.NodeID)
 	if err != nil {
 		return GatewayNameModel{}, errors.Wrapf(err, "failed to get node %d client", gateway.NodeID)
 	}
@@ -110,15 +111,15 @@ func (r *Router) gatewayNameDeploy(ctx context.Context, gatewayNameModel Gateway
 		return GatewayNameModel{}, errors.Wrapf(err, "failed to get node %d public config", gateway.NodeID)
 	}
 
-	gatewayNameModel.FQDN = fmt.Sprintf("%s.%s", gateway.Name, cfg.Domain)
-	gatewayNameModel.ContractID = gateway.ContractID
-	gatewayNameModel.NameContractID = gateway.NameContractID
+	gatewayNameModel.FQDN = fmt.Sprintf("%s.%s", gw.Name, cfg.Domain)
+	gatewayNameModel.ContractID = gw.ContractID
+	gatewayNameModel.NameContractID = gw.NameContractID
 
 	return gatewayNameModel, nil
 }
 
 func (r *Router) gatewayNameDelete(ctx context.Context, projectName string) error {
-	if err := r.Client.CancelByProjectName(projectName); err != nil {
+	if err := r.client.CancelProject(ctx, projectName); err != nil {
 		return errors.Wrapf(err, "failed to cancel project %s", projectName)
 	}
 
@@ -126,7 +127,7 @@ func (r *Router) gatewayNameDelete(ctx context.Context, projectName string) erro
 }
 
 func (r *Router) gatewayNameGet(ctx context.Context, projectName string) (GatewayNameModel, error) {
-	contracts, err := r.Client.ContractsGetter.ListContractsOfProjectName(projectName)
+	contracts, err := r.client.GetProjectContracts(ctx, projectName)
 	if err != nil {
 		return GatewayNameModel{}, errors.Wrapf(err, "failed to get project %s contracts", projectName)
 	}
@@ -141,7 +142,7 @@ func (r *Router) gatewayNameGet(ctx context.Context, projectName string) (Gatewa
 
 	nodeID := contracts.NodeContracts[0].NodeID
 
-	nodeClient, err := r.Client.NcPool.GetNodeClient(r.Client.SubstrateConn, nodeID)
+	nodeClient, err := r.client.GetNodeClient(nodeID)
 	if err != nil {
 		return GatewayNameModel{}, errors.Wrapf(err, "failed to get node %d client", nodeID)
 	}

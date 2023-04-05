@@ -93,17 +93,18 @@ func (r *Router) gatewayFQDNDeploy(ctx context.Context, gatewayFQDNModel Gateway
 		SolutionType:   projectName,
 	}
 
-	if err := r.Client.GatewayFQDNDeployer.Deploy(ctx, &gatewayFQDN); err != nil {
+	gw, err := r.client.DeployGWFQDN(ctx, &gatewayFQDN)
+	if err != nil {
 		return GatewayFQDNModel{}, errors.Wrapf(err, "failed to deploy gateway fqdn")
 	}
 
-	gatewayFQDNModel.ContractID = gatewayFQDN.ContractID
+	gatewayFQDNModel.ContractID = gw.ContractID
 
 	return gatewayFQDNModel, nil
 }
 
 func (r *Router) gatewayFQDNDelete(ctx context.Context, projectName string) error {
-	if err := r.Client.CancelByProjectName(projectName); err != nil {
+	if err := r.client.CancelProject(ctx, projectName); err != nil {
 		return errors.Wrapf(err, "failed to delete gateway fqdn model contracts")
 	}
 
@@ -111,7 +112,7 @@ func (r *Router) gatewayFQDNDelete(ctx context.Context, projectName string) erro
 }
 
 func (r *Router) gatewayFQDNGet(ctx context.Context, projectName string) (GatewayFQDNModel, error) {
-	contracts, err := r.Client.ContractsGetter.ListContractsOfProjectName(projectName)
+	contracts, err := r.client.GetProjectContracts(ctx, projectName)
 	if err != nil {
 		return GatewayFQDNModel{}, errors.Wrapf(err, "failed to get project %s contracts", projectName)
 	}
@@ -122,7 +123,7 @@ func (r *Router) gatewayFQDNGet(ctx context.Context, projectName string) (Gatewa
 
 	nodeID := contracts.NodeContracts[0].NodeID
 
-	nodeClient, err := r.Client.NcPool.GetNodeClient(r.Client.SubstrateConn, nodeID)
+	nodeClient, err := r.client.GetNodeClient(nodeID)
 	if err != nil {
 		return GatewayFQDNModel{}, errors.Wrapf(err, "failed to get node %d client", nodeID)
 	}
@@ -137,13 +138,13 @@ func (r *Router) gatewayFQDNGet(ctx context.Context, projectName string) (Gatewa
 		return GatewayFQDNModel{}, errors.Wrapf(err, "failed to get deployment with contract id %d", nodeContractID)
 	}
 
-	gatewayWorkload := workloads.GatewayFQDNProxy{}
+	if len(dl.Workloads) != 1 {
+		return GatewayFQDNModel{}, errors.Wrapf(err, "deployment should include only one gateway workload, but %d were found", len(dl.Workloads))
+	}
 
-	for _, wl := range dl.Workloads {
-		gatewayWorkload, err = workloads.NewGatewayFQDNProxyFromZosWorkload(wl)
-		if err != nil {
-			return GatewayFQDNModel{}, errors.Wrapf(err, "failed to parse gateway workload data")
-		}
+	gatewayWorkload, err := workloads.NewGatewayFQDNProxyFromZosWorkload(dl.Workloads[0])
+	if err != nil {
+		return GatewayFQDNModel{}, errors.Wrapf(err, "failed to parse gateway workload data")
 	}
 
 	res := GatewayFQDNModel{

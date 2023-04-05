@@ -128,7 +128,7 @@ func (r *Router) k8sDeploy(ctx context.Context, cluster K8sCluster, projectName 
 		SolutionType: projectName,
 	}
 
-	err = r.Client.NetworkDeployer.Deploy(ctx, &znet)
+	_, err = r.client.DeployNetwork(ctx, &znet)
 	if err != nil {
 		return K8sCluster{}, errors.Wrap(err, "failed to deploy network")
 	}
@@ -150,21 +150,21 @@ func (r *Router) k8sDeploy(ctx context.Context, cluster K8sCluster, projectName 
 	}
 
 	// Deploy workload
-	err = r.Client.K8sDeployer.Deploy(ctx, &k8s)
+	resK8s, err := r.client.DeployK8sCluster(ctx, &k8s)
 	if err != nil {
 		return K8sCluster{}, errors.Wrapf(err, "Failed to deploy K8s Cluster")
 	}
 
-	cluster.Master.assignComputedNodeValues(*k8s.Master)
+	cluster.Master.assignComputedNodeValues(*resK8s.Master)
 	for idx := range k8s.Workers {
-		cluster.Workers[idx].assignComputedNodeValues(k8s.Workers[idx])
+		cluster.Workers[idx].assignComputedNodeValues(resK8s.Workers[idx])
 	}
 
 	return cluster, nil
 }
 
 func (r *Router) k8sDelete(ctx context.Context, projectName string) error {
-	err := r.Client.CancelByProjectName(projectName)
+	err := r.client.CancelProject(ctx, projectName)
 	if err != nil {
 		return errors.Wrapf(err, "failed to cancel project: %s", projectName)
 	}
@@ -174,7 +174,7 @@ func (r *Router) k8sDelete(ctx context.Context, projectName string) error {
 
 func (r *Router) k8sGet(ctx context.Context, clusterName string, projectName string) (K8sCluster, error) {
 	// get all contracts by project name
-	contracts, err := r.Client.ContractsGetter.ListContractsOfProjectName(projectName)
+	contracts, err := r.client.GetProjectContracts(ctx, projectName)
 	if err != nil {
 		return K8sCluster{}, errors.Wrapf(err, "failed to get contracts for project: %s", projectName)
 	}
@@ -193,7 +193,7 @@ func (r *Router) k8sGet(ctx context.Context, clusterName string, projectName str
 	nodeNameDiskSizeMap := map[string]int{}
 
 	for _, contract := range contracts.NodeContracts {
-		nodeClient, err := r.Client.NcPool.GetNodeClient(r.Client.SubstrateConn, contract.NodeID)
+		nodeClient, err := r.client.GetNodeClient(contract.NodeID)
 		if err != nil {
 			return K8sCluster{}, errors.Wrapf(err, "failed to get node %d client", contract.NodeID)
 		}
