@@ -87,14 +87,7 @@ func (r *Router) gatewayNameDeploy(ctx context.Context, gatewayNameModel Gateway
 	}
 
 	// deploy gateway
-	gateway := workloads.GatewayNameProxy{
-		NodeID:         gatewayNameModel.NodeID,
-		Name:           gatewayNameModel.Name,
-		Backends:       gatewayNameModel.Backends,
-		TLSPassthrough: gatewayNameModel.TLSPassthrough,
-		Description:    gatewayNameModel.Description,
-		SolutionType:   projectName,
-	}
+	gateway := newGWNameProxyFromModel(gatewayNameModel, projectName)
 
 	gw, err := r.client.DeployGWName(ctx, &gateway)
 	if err != nil {
@@ -116,6 +109,17 @@ func (r *Router) gatewayNameDeploy(ctx context.Context, gatewayNameModel Gateway
 	gatewayNameModel.NameContractID = gw.NameContractID
 
 	return gatewayNameModel, nil
+}
+
+func newGWNameProxyFromModel(model GatewayNameModel, projectName string) workloads.GatewayNameProxy {
+	return workloads.GatewayNameProxy{
+		NodeID:         model.NodeID,
+		Name:           model.Name,
+		Backends:       model.Backends,
+		TLSPassthrough: model.TLSPassthrough,
+		Description:    model.Description,
+		SolutionType:   projectName,
+	}
 }
 
 func (r *Router) gatewayNameDelete(ctx context.Context, projectName string) error {
@@ -152,6 +156,11 @@ func (r *Router) gatewayNameGet(ctx context.Context, projectName string) (Gatewa
 		return GatewayNameModel{}, errors.Wrapf(err, "could not parse contract %s into uint64", contracts.NodeContracts[0].ContractID)
 	}
 
+	nameContractID, err := strconv.ParseUint(contracts.NameContracts[0].ContractID, 0, 64)
+	if err != nil {
+		return GatewayNameModel{}, errors.Wrapf(err, "could not parse contract %s into uint64", contracts.NameContracts[0].ContractID)
+	}
+
 	dl, err := nodeClient.DeploymentGet(ctx, nodeContractID)
 	if err != nil {
 		return GatewayNameModel{}, errors.Wrapf(err, "failed to get deployment with contract id %d", nodeContractID)
@@ -161,26 +170,35 @@ func (r *Router) gatewayNameGet(ctx context.Context, projectName string) (Gatewa
 		return GatewayNameModel{}, errors.Wrapf(err, "deployment should include only one gateway workload, but %d were found", len(dl.Workloads))
 	}
 
-	gatewayWorkload, err := workloads.NewGatewayNameProxyFromZosWorkload(dl.Workloads[0])
-	if err != nil {
-		return GatewayNameModel{}, errors.Wrapf(err, "failed to parse gateway workload data")
+	// gatewayWorkload, err := workloads.NewGatewayNameProxyFromZosWorkload(dl.Workloads[0])
+	// if err != nil {
+	// 	return GatewayNameModel{}, errors.Wrapf(err, "failed to parse gateway workload data")
+	// }
+	wl := dl.Workloads[0]
+	var result zos.GatewayProxyResult
+
+	if err := json.Unmarshal(wl.Result.Data, &result); err != nil {
+		return GatewayNameModel{}, errors.Wrap(err, "error unmarshalling json")
 	}
 
-	nameContractID, err := strconv.ParseUint(contracts.NameContracts[0].ContractID, 0, 64)
+	dataI, err := wl.WorkloadData()
 	if err != nil {
-		return GatewayNameModel{}, errors.Wrapf(err, "could not parse contract %s into uint64", contracts.NameContracts[0].ContractID)
+		return GatewayNameModel{}, errors.Wrap(err, "failed to get workload data")
 	}
 
-	res := GatewayNameModel{
+	data, ok := dataI.(*zos.GatewayNameProxy)
+	if !ok {
+		return GatewayNameModel{}, fmt.Errorf("could not create gateway name proxy workload from data %v", dataI)
+	}
+
+	return GatewayNameModel{
+		Name:           data.Name,
+		TLSPassthrough: data.TLSPassthrough,
+		Backends:       data.Backends,
+		FQDN:           result.FQDN,
+		Description:    wl.Description,
 		NodeID:         nodeID,
-		Name:           gatewayWorkload.Name,
-		Backends:       gatewayWorkload.Backends,
-		TLSPassthrough: gatewayWorkload.TLSPassthrough,
-		Description:    gatewayWorkload.Description,
-		FQDN:           gatewayWorkload.FQDN,
 		NameContractID: nameContractID,
 		ContractID:     nodeContractID,
-	}
-
-	return res, nil
+	}, nil
 }

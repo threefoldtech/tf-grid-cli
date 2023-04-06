@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	github.com/cosmos/go-bip39 v1.0.0
+	github.com/golang/mock v1.6.0
 	github.com/gomodule/redigo v2.0.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.29.0
@@ -12,6 +13,7 @@ require (
 	github.com/stretchr/testify v1.8.2
 	github.com/threefoldtech/grid3-go v1.0.2-0.20230403151102-cd78ab197417
 	github.com/threefoldtech/grid_proxy_server v1.6.12
+	github.com/threefoldtech/rmb-sdk-go v1.0.1-0.20230316162347-255e7faa0006
 	github.com/threefoldtech/zos v0.5.6-0.20230224113017-e887a6ca3fc5
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20200609130330-bd2cb7843e1b
 )
@@ -44,7 +46,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rs/cors v1.8.2 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/threefoldtech/rmb-sdk-go v1.0.1-0.20230316162347-255e7faa0006 // indirect
 	github.com/threefoldtech/substrate-client v0.1.5 // indirect
 	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
 	github.com/vedhavyas/go-subkey v1.0.3 // indirect

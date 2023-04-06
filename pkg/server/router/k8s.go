@@ -121,7 +121,6 @@ func (r *Router) k8sDeploy(ctx context.Context, cluster K8sCluster, projectName 
 	}
 
 	znet := workloads.ZNet{
-		// Name:         fmt.Sprintf("%s_network", cluster.NetworkName),
 		Name:         cluster.NetworkName,
 		Nodes:        nodeList,
 		IPRange:      ipRange,

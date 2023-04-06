@@ -142,20 +142,24 @@ func (r *Router) gatewayFQDNGet(ctx context.Context, projectName string) (Gatewa
 		return GatewayFQDNModel{}, errors.Wrapf(err, "deployment should include only one gateway workload, but %d were found", len(dl.Workloads))
 	}
 
-	gatewayWorkload, err := workloads.NewGatewayFQDNProxyFromZosWorkload(dl.Workloads[0])
+	wl := &dl.Workloads[0]
+	dataI, err := wl.WorkloadData()
 	if err != nil {
-		return GatewayFQDNModel{}, errors.Wrapf(err, "failed to parse gateway workload data")
+		return GatewayFQDNModel{}, errors.Wrap(err, "failed to get workload data")
 	}
 
-	res := GatewayFQDNModel{
+	data, ok := dataI.(*zos.GatewayFQDNProxy)
+	if !ok {
+		return GatewayFQDNModel{}, fmt.Errorf("could not create gateway fqdn proxy workload from data %v", dataI)
+	}
+
+	return GatewayFQDNModel{
 		NodeID:         nodeID,
-		Name:           gatewayWorkload.Name,
-		Backends:       gatewayWorkload.Backends,
-		TLSPassthrough: gatewayWorkload.TLSPassthrough,
-		Description:    gatewayWorkload.Description,
-		FQDN:           gatewayWorkload.FQDN,
+		Name:           wl.Name.String(),
+		TLSPassthrough: data.TLSPassthrough,
+		Backends:       data.Backends,
+		FQDN:           data.FQDN,
+		Description:    wl.Description,
 		ContractID:     nodeContractID,
-	}
-
-	return res, nil
+	}, nil
 }
