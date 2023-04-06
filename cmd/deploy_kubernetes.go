@@ -117,7 +117,7 @@ var deployKubernetesCmd = &cobra.Command{
 		if err != nil {
 			log.Fatal().Err(err).Send()
 		}
-		t, err := deployer.NewTFPluginClient(cfg.Mnemonics, "sr25519", cfg.Network, "", "", "", true, false)
+		t, err := deployer.NewTFPluginClient(cfg.Mnemonics, "sr25519", cfg.Network, "", "", "", 10, true, false)
 		if err != nil {
 			log.Fatal().Err(err).Send()
 		}

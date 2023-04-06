@@ -9,18 +9,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
-	"github.com/threefoldtech/grid3-go/deployer"
 	router "github.com/threefoldtech/tf-grid-cli/pkg/server/router"
 )
 
 type Server struct {
 	redisClient RedisClient
-	router      Router
-	client      *deployer.TFPluginClient
-}
-
-type Router struct {
-	routes map[string]func(ctx context.Context, client *deployer.TFPluginClient, data string) (interface{}, error)
+	router      router.Router
 }
 
 type Request struct {
@@ -53,46 +47,45 @@ func NewServer() (*Server, error) {
 		return nil, errors.Wrap(err, "failed to create new redis client")
 	}
 
-	r := Router{
-		routes: make(map[string]func(ctx context.Context, client *deployer.TFPluginClient, data string) (interface{}, error)),
+	r := router.Router{
+		Routes: make(map[string]func(r *router.Router, ctx context.Context, data string) (interface{}, error)),
 	}
 
 	server := Server{
 		redisClient,
 		r,
-		&deployer.TFPluginClient{},
 	}
 
-	server.Register("tfgrid.login", router.Login)
+	server.Register("tfgrid.login", (*router.Router).Login)
 
-	server.Register("tfgrid.machines.deploy", router.MachinesDeploy)
-	server.Register("tfgrid.machines.delete", router.MachinesDelete)
-	server.Register("tfgrid.machines.get", router.MachinesGet)
+	server.Register("tfgrid.machines.deploy", (*router.Router).MachinesDeploy)
+	server.Register("tfgrid.machines.delete", (*router.Router).MachinesDelete)
+	server.Register("tfgrid.machines.get", (*router.Router).MachinesGet)
 	// server.Register("tfgrid.machines.machine.add", router.MachineAdd)
 	// server.Register("tfgrid.machines.machine.remove", router.MachineRemove)
 
-	server.Register("tfgrid.gateway.name.deploy", router.GatewayNameDeploy)
-	server.Register("tfgrid.gateway.name.delete", router.GatewayNameDelete)
-	server.Register("tfgrid.gateway.name.get", router.GatewayNameGet)
-	server.Register("tfgrid.gateway.fqdn.deploy", router.GatewayFQDNDeploy)
-	server.Register("tfgrid.gateway.fqdn.get", router.GatewayFQDNGet)
-	server.Register("tfgrid.gateway.fqdn.delete", router.GatewayFQDNDelete)
+	server.Register("tfgrid.gateway.name.deploy", (*router.Router).GatewayNameDeploy)
+	server.Register("tfgrid.gateway.name.delete", (*router.Router).GatewayNameDelete)
+	server.Register("tfgrid.gateway.name.get", (*router.Router).GatewayNameGet)
+	server.Register("tfgrid.gateway.fqdn.deploy", (*router.Router).GatewayFQDNDeploy)
+	server.Register("tfgrid.gateway.fqdn.get", (*router.Router).GatewayFQDNGet)
+	server.Register("tfgrid.gateway.fqdn.delete", (*router.Router).GatewayFQDNDelete)
 
-	server.Register("tfgrid.k8s.get", router.K8sGet)
-	server.Register("tfgrid.k8s.deploy", router.K8sDeploy)
-	server.Register("tfgrid.k8s.delete", router.K8sDelete)
+	server.Register("tfgrid.k8s.get", (*router.Router).K8sGet)
+	server.Register("tfgrid.k8s.deploy", (*router.Router).K8sDeploy)
+	server.Register("tfgrid.k8s.delete", (*router.Router).K8sDelete)
 	// server.Register("tfgrid.k8s.node.add", router.K8sAddNode)
 	// server.Register("tfgrid.k8s.node.remove", router.K8sRemoveNode)
 
-	server.Register("tfgrid.zdb.deploy", router.ZDBDeploy)
-	server.Register("tfgrid.zdb.delete", router.ZDBDelete)
-	server.Register("tfgrid.zdb.get", router.ZDBGet)
+	server.Register("tfgrid.zdb.deploy", (*router.Router).ZDBDeploy)
+	server.Register("tfgrid.zdb.delete", (*router.Router).ZDBDelete)
+	server.Register("tfgrid.zdb.get", (*router.Router).ZDBGet)
 
 	return &server, nil
 }
 
-func (s *Server) Register(route string, fn func(context.Context, *deployer.TFPluginClient, string) (interface{}, error)) {
-	s.router.routes[route] = fn
+func (s *Server) Register(route string, fn func(*router.Router, context.Context, string) (interface{}, error)) {
+	s.router.Routes[route] = fn
 }
 
 func NewRedisClient() (RedisClient, error) {
@@ -134,9 +127,10 @@ func (s *Server) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			res, err := redis.ByteSlices(con.Do("BRPOP", "tfgrid.client", 0))
+			res, err := redis.ByteSlices(con.Do("BRPOP", "tfgrid.client", 10))
 			if err != nil {
-				return errors.Wrap(err, "failted to read from redis")
+				log.Debug().Msgf("redis BRPOP timeout expired. retrying...")
+				continue
 			}
 
 			go s.process(ctx, res[1])
@@ -158,13 +152,13 @@ func (s *Server) process(ctx context.Context, message []byte) {
 		return
 	}
 
-	cmd, ok := s.router.routes[args.Method]
+	cmd, ok := s.router.Routes[args.Method]
 	if !ok {
 		log.Error().Msgf("invalid command %s. message is dropped", args.Method)
 		return
 	}
 
-	res, err := cmd(ctx, s.client, string(args.Params))
+	res, err := cmd(&s.router, ctx, string(args.Params))
 	response := Response{
 		JsonRPC: args.JsonRPC,
 		ID:      args.ID,
