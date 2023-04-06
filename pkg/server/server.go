@@ -81,6 +81,19 @@ func NewServer() (*Server, error) {
 	server.Register("tfgrid.zdb.delete", (*router.Router).ZDBDelete)
 	server.Register("tfgrid.zdb.get", (*router.Router).ZDBGet)
 
+	server.Register("zos.deployment.deploy", (*router.Router).ZOSDeploymentDeploy)
+	server.Register("zos.deployment.update", (*router.Router).ZOSDeploymentUpdate)
+	server.Register("zos.deployment.get", (*router.Router).ZOSDeploymentGet)
+	server.Register("zos.deployment.delete", (*router.Router).ZOSDeploymentDelete)
+	server.Register("zos.deployment.changes", (*router.Router).ZOSDeploymentChanges)
+	server.Register("zos.statistics.get", (*router.Router).ZOSStatisticsGet)
+	server.Register("zos.network.list_wg_ports", (*router.Router).ZOSNetworkListWGPorts)
+	server.Register("zos.network.interfaces", (*router.Router).ZOSNetworkInterfaces)
+	server.Register("zos.network.public_config_get", (*router.Router).ZOSNetworkPublicConfigGet)
+	server.Register("zos.system.dmi", (*router.Router).ZOSSystemDMI)
+	server.Register("zos.system.hypervisor", (*router.Router).ZOSSystemHypervisor)
+	server.Register("zos.system.version", (*router.Router).ZOSVersion)
+
 	return &server, nil
 }
 
