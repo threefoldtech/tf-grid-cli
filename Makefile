@@ -57,4 +57,7 @@ staticcheck:
 
 build:
 	@echo "Running $@"
-	go build -o bin/tf-grid-cli main.go
+	@go build -ldflags=\
+	"-X 'github.com/threefoldtech/tf-grid-cli/cmd.Commit=$(shell git rev-parse HEAD)'\
+	 -X 'github.com/threefoldtech/tf-grid-cli/cmd.Version=$(shell git tag --sort=-version:refname | head -n 1)'"\
+	 -o bin/tf-grid-cli main.go
