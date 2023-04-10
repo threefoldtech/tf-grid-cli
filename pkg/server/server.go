@@ -88,6 +88,8 @@ func NewServer() (*Server, error) {
 	server.Register("tfgrid.zdb.delete", router.ZDBDelete)
 	server.Register("tfgrid.zdb.get", router.ZDBGet)
 
+	server.Register("tfgrid.capacity.filterNodes", router.FilterNodes)
+
 	return &server, nil
 }
 

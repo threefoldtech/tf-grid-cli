@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 	"github.com/threefoldtech/grid3-go/deployer"
 	"github.com/threefoldtech/grid3-go/workloads"
 	"github.com/threefoldtech/tf-grid-cli/pkg/server/types"
@@ -26,7 +25,7 @@ func K8sDeploy(ctx context.Context, cluster types.K8sCluster, client *deployer.T
 		return types.K8sCluster{}, fmt.Errorf("You have a cluster with the same name: %s", cluster.Name)
 	}
 
-	err = utils.AssignNodesIDsForCluster(client, &cluster)
+	err = assignNodesIDsForCluster(ctx, client, &cluster)
 	if err != nil {
 		return types.K8sCluster{}, errors.Wrapf(err, "Couldn't find node for all cluster nodes")
 	}
@@ -81,9 +80,6 @@ func K8sDeploy(ctx context.Context, cluster types.K8sCluster, client *deployer.T
 		Master:       &master,
 		Workers:      workers,
 	}
-
-	log.Info().Msgf("workloadCluster: %+v", k8s)
-	log.Info().Msgf("Deploying....")
 
 	// Deploy workload
 	err = client.K8sDeployer.Deploy(ctx, &k8s)
@@ -245,4 +241,62 @@ func assignComputedNodeValues(node workloads.K8sNode, resultNode *types.K8sNode)
 
 func isWorker(vm workloads.VM) bool {
 	return len(vm.EnvVars["K3S_URL"]) != 0
+}
+
+// Assign chosen NodeIds to cluster node. with both way conversions to/from Reservations array.
+func assignNodesIDsForCluster(ctx context.Context, client *deployer.TFPluginClient, cluster *types.K8sCluster) error {
+	// all units unified in bytes
+
+	workloads := []*utils.PlannedReservation{}
+
+	if cluster.Master.NodeID == 0 {
+
+		ms := utils.PlannedReservation{
+			WorkloadName: cluster.Master.Name,
+			MRU:          uint64(cluster.Master.Memory * int(gridtypes.Megabyte)),
+			SRU:          uint64(cluster.Master.DiskSize * int(gridtypes.Gigabyte)),
+			FarmID:       cluster.Master.FarmID,
+		}
+
+		workloads = append(workloads, &ms)
+	}
+
+	for idx := range cluster.Workers {
+		if cluster.Workers[idx].NodeID == 0 {
+
+			wr := utils.PlannedReservation{
+				WorkloadName: cluster.Workers[idx].Name,
+				MRU:          uint64(cluster.Workers[idx].Memory * int(gridtypes.Megabyte)),
+				SRU:          uint64(cluster.Workers[idx].DiskSize * int(gridtypes.Gigabyte)),
+				FarmID:       cluster.Workers[idx].FarmID,
+			}
+
+			workloads = append(workloads, &wr)
+		}
+	}
+
+	err := utils.AssignNodes(ctx, client, workloads)
+	if err != nil {
+		return err
+	}
+
+	if cluster.Master.NodeID == 0 {
+		for _, workload := range workloads {
+			if workload.WorkloadName == cluster.Master.Name {
+				cluster.Master.NodeID = uint32(workload.NodeID)
+			}
+		}
+	}
+
+	for idx := range cluster.Workers {
+		if cluster.Workers[idx].NodeID == 0 {
+			for _, workload := range workloads {
+				if workload.WorkloadName == cluster.Workers[idx].Name {
+					cluster.Workers[idx].NodeID = uint32(workload.NodeID)
+				}
+			}
+		}
+	}
+
+	return nil
 }

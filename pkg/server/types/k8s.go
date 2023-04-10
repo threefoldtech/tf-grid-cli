@@ -22,6 +22,7 @@ type K8sCluster struct {
 type K8sNode struct {
 	Name      string `json:"name"`
 	NodeID    uint32 `json:"node_id"`
+	FarmID    uint32 `json:"farm_id"`
 	DiskSize  int    `json:"disk_size"`
 	PublicIP  bool   `json:"public_ip"`
 	PublicIP6 bool   `json:"public_ip6"`

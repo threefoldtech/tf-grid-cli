@@ -2,12 +2,14 @@ package procedure
 
 import (
 	"context"
+	"math/rand"
 	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/threefoldtech/grid3-go/deployer"
 	"github.com/threefoldtech/grid3-go/graphql"
 	"github.com/threefoldtech/grid3-go/workloads"
+	proxyTypes "github.com/threefoldtech/grid_proxy_server/pkg/types"
 	"github.com/threefoldtech/tf-grid-cli/pkg/server/types"
 	"github.com/threefoldtech/tf-grid-cli/pkg/server/utils"
 )
@@ -19,7 +21,7 @@ func GatewayNameDeploy(ctx context.Context, gatewayNameModel types.GatewayNameMo
 	}
 
 	if gatewayNameModel.NodeID == 0 {
-		nodeId, err := utils.GetGatewayNode(client)
+		nodeId, err := getGatewayNode(client)
 		if err != nil {
 			return types.GatewayNameModel{}, errors.Wrapf(err, "Couldn't find a gateway node")
 		}
@@ -173,16 +175,6 @@ func GatewayFQDNDeploy(ctx context.Context, gatewayFQDNModel types.GatewayFQDNMo
 		return types.GatewayFQDNModel{}, err
 	}
 
-	if gatewayFQDNModel.NodeID == 0 {
-		nodeId, err := utils.GetGatewayNode(client)
-
-		if err != nil {
-			return types.GatewayFQDNModel{}, errors.Wrapf(err, "Couldn't find a gateway node")
-		}
-
-		gatewayFQDNModel.NodeID = nodeId
-	}
-
 	gatewayFQDN := workloads.GatewayFQDNProxy{
 		NodeID:         gatewayFQDNModel.NodeID,
 		Backends:       gatewayFQDNModel.Backends,
@@ -291,4 +283,19 @@ func GatewayFQDNGet(ctx context.Context, name string, client *deployer.TFPluginC
 	}
 
 	return res, nil
+}
+
+func getGatewayNode(client *deployer.TFPluginClient) (uint32, error) {
+	options := proxyTypes.NodeFilter{
+		Status: &utils.Status,
+		IPv4:   &utils.TrueVal,
+		Domain: &utils.TrueVal,
+	}
+
+	nodes, err := deployer.FilterNodes(client.GridProxyClient, options)
+	if err != nil || len(nodes) == 0 {
+		return 0, errors.Wrapf(err, "Couldn't find node for the provided filters: %+v", options)
+	}
+
+	return uint32(nodes[rand.Intn(len(nodes))].NodeID), nil
 }

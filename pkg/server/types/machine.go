@@ -6,6 +6,7 @@ import (
 
 type Machine struct {
 	NodeID      uint32            `json:"node_id"`
+	FarmID      uint32            `json:"farm_id"`
 	Name        string            `json:"name"`
 	Flist       string            `json:"flist"`
 	PublicIP    bool              `json:"public_ip"`

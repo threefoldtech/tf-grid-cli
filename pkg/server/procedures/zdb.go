@@ -3,6 +3,7 @@ package procedure
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/threefoldtech/grid3-go/deployer"
 	"github.com/threefoldtech/grid3-go/workloads"
+	proxyTypes "github.com/threefoldtech/grid_proxy_server/pkg/types"
 	"github.com/threefoldtech/tf-grid-cli/pkg/server/types"
 	"github.com/threefoldtech/tf-grid-cli/pkg/server/utils"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
@@ -28,7 +30,7 @@ func ZDBDeploy(ctx context.Context, zdb types.ZDB, client *deployer.TFPluginClie
 
 	// capacity filter
 	if zdb.NodeID == 0 {
-		nodeId, err := utils.GetNodeForZdb(client, uint64(zdb.Size))
+		nodeId, err := getNodeForZdb(client, uint64(zdb.Size))
 		if err != nil {
 			return types.ZDB{}, errors.Wrapf(err, "Couldn't find a gateway node")
 		}
@@ -136,4 +138,18 @@ func convertWrokloadtoZDB(wl workloads.ZDB) types.ZDB {
 		Namespace:   wl.Namespace,
 		IPs:         wl.IPs,
 	}
+}
+
+func getNodeForZdb(client *deployer.TFPluginClient, size uint64) (uint32, error) {
+	options := proxyTypes.NodeFilter{
+		Status:  &utils.Status,
+		FreeHRU: &size,
+	}
+
+	nodes, err := deployer.FilterNodes(client.GridProxyClient, options)
+	if err != nil || len(nodes) == 0 {
+		return 0, errors.Wrapf(err, "Couldn't find node for the provided filters: %+v", options)
+	}
+
+	return uint32(nodes[rand.Intn(len(nodes))].NodeID), nil
 }
