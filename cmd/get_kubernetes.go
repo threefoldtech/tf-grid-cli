@@ -3,13 +3,11 @@ package cmd
 
 import (
 	"encoding/json"
-	"os"
-	"strconv"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/threefoldtech/grid3-go/deployer"
-	"github.com/threefoldtech/grid3-go/workloads"
+	command "github.com/threefoldtech/tf-grid-cli/internal/cmd"
 	"github.com/threefoldtech/tf-grid-cli/internal/config"
 )
 
@@ -27,37 +25,12 @@ var getKubernetesCmd = &cobra.Command{
 		if err != nil {
 			log.Fatal().Err(err).Send()
 		}
-		contracts, err := t.ContractsGetter.ListContractsOfProjectName(args[0])
-		if err != nil {
-			log.Fatal().Err(err).Send()
-		}
-		var nodeIDs []uint32
-		for _, contract := range contracts.NodeContracts {
-			var deploymentData workloads.DeploymentData
-			err := json.Unmarshal([]byte(contract.DeploymentData), &deploymentData)
-			if err != nil {
-				log.Fatal().Err(err).Send()
-			}
-			if deploymentData.Type != "kubernetes" || deploymentData.Name != args[0] {
-				continue
-			}
-			nodeIDs = append(nodeIDs, contract.NodeID)
-			contractID, err := strconv.ParseUint(contract.ContractID, 0, 64)
-			if err != nil {
-				log.Fatal().Err(err).Send()
-			}
-			t.State.CurrentNodeDeployments[contract.NodeID] = append(t.State.CurrentNodeDeployments[contract.NodeID], contractID)
-		}
-		if nodeIDs == nil {
-			log.Info().Msgf("no kubernetes cluster with name %s found", args[0])
-			os.Exit(0)
-		}
 
-		vm, err := t.State.LoadK8sFromGrid(nodeIDs, args[0])
+		cluster, err := command.GetK8sCluster(t, args[0])
 		if err != nil {
 			log.Fatal().Err(err).Send()
 		}
-		s, err := json.MarshalIndent(vm, "", "\t")
+		s, err := json.MarshalIndent(cluster, "", "\t")
 		if err != nil {
 			log.Fatal().Err(err).Send()
 		}
