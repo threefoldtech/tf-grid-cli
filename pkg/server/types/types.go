@@ -3,7 +3,7 @@ package types
 type FilterOptions struct {
 	FarmID         uint32 `json:"farm_id"`
 	PublicConfig   bool   `json:"public_config"`
-	PublicIpsCount uint   `json:"public_ips_count"`
+	PublicIpsCount uint64 `json:"public_ips_count"`
 	Dedicated      bool   `json:"dedicated"`
 	MRU            uint64 `json:"mru"`
 	HRU            uint64 `json:"hru"`

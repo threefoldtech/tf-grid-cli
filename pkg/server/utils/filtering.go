@@ -32,7 +32,7 @@ type PlannedReservation struct {
 	MRU          uint64
 	SRU          uint64
 	HRU          uint64
-	CRU          uint64
+	PublicIps    bool
 }
 
 type Args struct {
@@ -72,6 +72,46 @@ type FarmerBotAction struct {
 	SourceTwinID uint32        `json:"src_twinid"`
 	SourceAction string        `json:"src_action"`
 	Dependencies []string      `json:"dependencies"`
+}
+
+func BuildGridProxyFilters(options types.FilterOptions) proxyTypes.NodeFilter {
+	// TODO:
+	twinId := uint64(220)
+	proxyFilters := proxyTypes.NodeFilter{
+		Status:       &Status,
+		AvailableFor: &twinId,
+	}
+
+	if options.HRU != 0 {
+		proxyFilters.FreeHRU = &options.HRU
+	}
+
+	if options.SRU != 0 {
+		proxyFilters.FreeSRU = &options.SRU
+	}
+
+	if options.MRU != 0 {
+		proxyFilters.FreeMRU = &options.MRU
+	}
+
+	if options.Dedicated {
+		proxyFilters.Dedicated = &options.Dedicated
+	}
+
+	if options.PublicConfig {
+		proxyFilters.IPv4 = &options.PublicConfig
+		proxyFilters.Domain = &options.PublicConfig
+	}
+
+	if options.PublicIpsCount > 0 {
+		proxyFilters.FreeIPs = &options.PublicIpsCount
+	}
+
+	if options.FarmID != 0 {
+		proxyFilters.FarmIDs = []uint64{uint64(options.FarmID)}
+	}
+
+	return proxyFilters
 }
 
 func BuildFarmerBotParams(options types.FilterOptions) []Params {
@@ -199,13 +239,7 @@ func FilterNodesWithFarmerBot(ctx context.Context, options types.FilterOptions, 
 }
 
 func FilterNodesWithGridProxy(ctx context.Context, options types.FilterOptions, client *deployer.TFPluginClient) (types.FilterResult, error) {
-	proxyFilters := proxyTypes.NodeFilter{
-		Status:  &Status,
-		FreeMRU: &options.MRU,
-		FreeSRU: &options.SRU,
-		FreeHRU: &options.HRU,
-		// TODO: add the others filters
-	}
+	proxyFilters := BuildGridProxyFilters(options)
 
 	nodes, err := deployer.FilterNodes(client.GridProxyClient, proxyFilters)
 	if err != nil || len(nodes) == 0 {
@@ -259,7 +293,6 @@ func checkNodeAvailability(client *deployer.TFPluginClient, nodeId uint32, workl
 
 	// get free resources
 	free := proxyTypes.Capacity{
-		CRU: node.Capacity.Total.CRU - node.Capacity.Used.CRU,
 		SRU: node.Capacity.Total.SRU - node.Capacity.Used.SRU,
 		HRU: node.Capacity.Total.HRU - node.Capacity.Used.HRU,
 		MRU: node.Capacity.Total.MRU - node.Capacity.Used.MRU,
@@ -267,9 +300,30 @@ func checkNodeAvailability(client *deployer.TFPluginClient, nodeId uint32, workl
 
 	// check if the free resource greater than the previous reserved capacity plus the current workload capacity
 	if uint64(free.MRU) >= reservedCapacity[uint32(node.NodeID)].MRU+workload.MRU &&
-		uint64(free.SRU) >= reservedCapacity[uint32(node.NodeID)].SRU+workload.SRU {
+		uint64(free.SRU) >= reservedCapacity[uint32(node.NodeID)].SRU+workload.SRU &&
+		uint64(free.HRU) >= reservedCapacity[uint32(node.NodeID)].HRU+workload.HRU {
 		return true
 	}
+	return false
+}
+
+func checkFarmAvailability(client *deployer.TFPluginClient, farmId uint64, workload PlannedReservation, reservedIps map[uint32]int) bool {
+	// get farm info
+	farms, _, err := client.GridProxyClient.Farms(proxyTypes.FarmFilter{
+		FarmID: &farmId,
+	}, proxyTypes.Limit{
+		Size: 1,
+		Page: 1,
+	})
+
+	if err != nil {
+		return false
+	}
+
+	if len(farms[0].PublicIps) > reservedIps[workload.FarmID] {
+		return true
+	}
+
 	return false
 }
 
@@ -277,54 +331,72 @@ func checkNodeAvailability(client *deployer.TFPluginClient, nodeId uint32, workl
 // Assign the NodeID if found one or return it with NodeID: 0
 func AssignNodes(ctx context.Context, client *deployer.TFPluginClient, workloads []*PlannedReservation) error {
 	reservedCapacity := make(map[uint32]PlannedReservation)
+	reservedIps := make(map[uint32]int)
 
 	for _, workload := range workloads {
-		options := types.FilterOptions{
-			FarmID: workload.FarmID,
-			// HRU: workload.NeededStorage,
-			SRU: workload.SRU,
-			MRU: workload.MRU,
-		}
-
-		var res types.FilterResult
-		var err error
-		ctx2, cancel := context.WithTimeout(ctx, 3*time.Second)
-		defer cancel()
-
-		// TODO: store the result to reduce the number of calls
-		hasFarmerBot := HasFarmerBot(ctx2, client, options.FarmID)
-
-		if options.FarmID != 0 && hasFarmerBot {
-			log.Info().Msg("Calling farmerbot")
-			res, err = FilterNodesWithFarmerBot(ctx, options, client)
-
-		} else {
-			log.Info().Msg("Calling gridproxy")
-			res, err = FilterNodesWithGridProxy(ctx, options, client)
-		}
-
-		if err != nil || len(res.AvailableNodes) == 0 {
-			return errors.Errorf("Failed to find node on farm %+v", options.FarmID)
-		}
-
-		nodes := res.AvailableNodes
-
-		selectedNodeId := uint32(0)
-
-		for _, nodeId := range nodes {
-			valid := checkNodeAvailability(client, nodeId, *workload, reservedCapacity)
-			if valid {
-				selectedNodeId = nodeId
-				break
+		if workload.NodeID == 0 {
+			options := types.FilterOptions{
+				FarmID: workload.FarmID,
+				HRU:    workload.HRU,
+				SRU:    workload.SRU,
+				MRU:    workload.MRU,
 			}
+
+			if workload.PublicIps {
+				options.PublicIpsCount = 1
+			}
+
+			var res types.FilterResult
+			var err error
+			ctx2, cancel := context.WithTimeout(ctx, 3*time.Second)
+			defer cancel()
+
+			// TODO: store the result to reduce the number of calls
+			hasFarmerBot := HasFarmerBot(ctx2, client, options.FarmID)
+
+			if options.FarmID != 0 && hasFarmerBot {
+				log.Info().Msg("Calling farmerbot")
+				res, err = FilterNodesWithFarmerBot(ctx, options, client)
+
+			} else {
+				log.Info().Msg("Calling gridproxy")
+				res, err = FilterNodesWithGridProxy(ctx, options, client)
+			}
+
+			if err != nil || len(res.AvailableNodes) == 0 {
+				return errors.Errorf("Failed to find node on farm %+v", options.FarmID)
+			}
+
+			var farmIsValid bool
+			if options.PublicIpsCount > 0 {
+				farmIsValid = checkFarmAvailability(client, uint64(options.FarmID), *workload, reservedIps)
+				if !farmIsValid {
+					return errors.Errorf("no publicIps available")
+				}
+				reservedIps[options.FarmID]++
+			}
+
+			nodes := res.AvailableNodes
+			selectedNodeId := uint32(0)
+			for _, nodeId := range nodes {
+				nodeIsValid := checkNodeAvailability(client, nodeId, *workload, reservedCapacity)
+				if nodeIsValid && farmIsValid {
+					selectedNodeId = nodeId
+					break
+				}
+			}
+
+			workload.NodeID = selectedNodeId
+
 		}
 
-		reservedCapacity[selectedNodeId] = PlannedReservation{
-			MRU: reservedCapacity[selectedNodeId].MRU + workload.MRU,
-			SRU: reservedCapacity[selectedNodeId].SRU + workload.SRU,
+		// update the reservedCapacity for the workload node with the resources. `either user provide NodeID or set by the filter`
+		reservedCapacity[workload.NodeID] = PlannedReservation{
+			MRU: reservedCapacity[workload.NodeID].MRU + workload.MRU,
+			SRU: reservedCapacity[workload.NodeID].SRU + workload.SRU,
+			HRU: reservedCapacity[workload.NodeID].HRU + workload.HRU,
 		}
 
-		workload.NodeID = selectedNodeId
 	}
 
 	return nil

@@ -60,7 +60,6 @@ func ZDBDeploy(ctx context.Context, zdb types.ZDB, client *deployer.TFPluginClie
 }
 
 func ZDBDelete(ctx context.Context, name string, client *deployer.TFPluginClient) error {
-	// TODO: fix canceling
 	err := client.CancelByProjectName(name)
 	if err != nil {
 		errors.Wrapf(err, "Failed to cancel cluster with name: %s", name)

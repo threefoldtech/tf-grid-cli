@@ -249,30 +249,27 @@ func assignNodesIDsForCluster(ctx context.Context, client *deployer.TFPluginClie
 
 	workloads := []*utils.PlannedReservation{}
 
-	if cluster.Master.NodeID == 0 {
-
-		ms := utils.PlannedReservation{
-			WorkloadName: cluster.Master.Name,
-			MRU:          uint64(cluster.Master.Memory * int(gridtypes.Megabyte)),
-			SRU:          uint64(cluster.Master.DiskSize * int(gridtypes.Gigabyte)),
-			FarmID:       cluster.Master.FarmID,
-		}
-
-		workloads = append(workloads, &ms)
+	ms := utils.PlannedReservation{
+		WorkloadName: cluster.Master.Name,
+		FarmID:       cluster.Master.FarmID,
+		MRU:          uint64(cluster.Master.Memory * int(gridtypes.Megabyte)),
+		SRU:          uint64(cluster.Master.DiskSize * int(gridtypes.Gigabyte)),
+		PublicIps:    cluster.Master.PublicIP,
 	}
 
+	workloads = append(workloads, &ms)
+
 	for idx := range cluster.Workers {
-		if cluster.Workers[idx].NodeID == 0 {
 
-			wr := utils.PlannedReservation{
-				WorkloadName: cluster.Workers[idx].Name,
-				MRU:          uint64(cluster.Workers[idx].Memory * int(gridtypes.Megabyte)),
-				SRU:          uint64(cluster.Workers[idx].DiskSize * int(gridtypes.Gigabyte)),
-				FarmID:       cluster.Workers[idx].FarmID,
-			}
-
-			workloads = append(workloads, &wr)
+		wr := utils.PlannedReservation{
+			WorkloadName: cluster.Workers[idx].Name,
+			FarmID:       cluster.Workers[idx].FarmID,
+			MRU:          uint64(cluster.Workers[idx].Memory * int(gridtypes.Megabyte)),
+			SRU:          uint64(cluster.Workers[idx].DiskSize * int(gridtypes.Gigabyte)),
+			PublicIps:    cluster.Workers[idx].PublicIP,
 		}
+
+		workloads = append(workloads, &wr)
 	}
 
 	err := utils.AssignNodes(ctx, client, workloads)

@@ -40,7 +40,6 @@ func MachinesDeploy(ctx context.Context, model types.MachinesModel, client *depl
 		return types.MachinesModel{}, fmt.Errorf("project name %s is not unique", model.Name)
 	}
 
-	// TODO: if machines don't have nodes assigned, should be assigned here
 	err = assignNodesIDsForMachines(ctx, client, &model)
 	if err != nil {
 		return types.MachinesModel{}, errors.Wrapf(err, "Couldn't find node for all machines model")
@@ -466,25 +465,23 @@ func assignNodesIDsForMachines(ctx context.Context, client *deployer.TFPluginCli
 	workloads := []*utils.PlannedReservation{}
 
 	for idx := range machines.Machines {
-		if machines.Machines[idx].NodeID == 0 {
-			neededSRU := 0
-			neededHRU := 0
-			for _, disk := range machines.Machines[idx].Disks {
-				neededSRU += disk.SizeGB * int(gridtypes.Gigabyte)
-			}
-			for _, qsfs := range machines.Machines[idx].QSFSs {
-				neededHRU += int(qsfs.Cache) * int(gridtypes.Gigabyte)
-			}
-			neededSRU += machines.Machines[idx].RootfsSize * int(gridtypes.Megabyte)
-
-			workloads = append(workloads, &utils.PlannedReservation{
-				WorkloadName: machines.Machines[idx].Name,
-				MRU:          uint64(machines.Machines[idx].Memory * int(gridtypes.Megabyte)),
-				SRU:          uint64(neededSRU),
-				HRU:          uint64(neededHRU),
-				FarmID:       machines.Machines[idx].FarmID,
-			})
+		neededSRU := 0
+		neededHRU := 0
+		for _, disk := range machines.Machines[idx].Disks {
+			neededSRU += disk.SizeGB * int(gridtypes.Gigabyte)
 		}
+		for _, qsfs := range machines.Machines[idx].QSFSs {
+			neededHRU += int(qsfs.Cache) * int(gridtypes.Gigabyte)
+		}
+		neededSRU += machines.Machines[idx].RootfsSize * int(gridtypes.Megabyte)
+
+		workloads = append(workloads, &utils.PlannedReservation{
+			WorkloadName: machines.Machines[idx].Name,
+			MRU:          uint64(machines.Machines[idx].Memory * int(gridtypes.Megabyte)),
+			SRU:          uint64(neededSRU),
+			HRU:          uint64(neededHRU),
+			FarmID:       machines.Machines[idx].FarmID,
+		})
 	}
 
 	err := utils.AssignNodes(ctx, client, workloads)
