@@ -1,4 +1,4 @@
-package router
+package client
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"github.com/threefoldtech/grid3-go/graphql"
 	client "github.com/threefoldtech/grid3-go/node"
 	"github.com/threefoldtech/grid3-go/workloads"
-	"github.com/threefoldtech/tf-grid-cli/pkg/server/router/mocks"
+	"github.com/threefoldtech/tf-grid-cli/pkg/server/cli_client/mocks"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
@@ -21,7 +21,7 @@ func TestGatewayName(t *testing.T) {
 
 	cl := mocks.NewMockTFGridClient(ctrl)
 
-	r := Router{
+	r := CLIClient{
 		client: cl,
 	}
 
@@ -85,7 +85,7 @@ func TestGatewayName(t *testing.T) {
 				*res = cfg
 				return nil
 			})
-		got, err := r.gatewayNameDeploy(context.Background(), model, projectName)
+		got, err := r.GatewayNameDeploy(context.Background(), model, projectName)
 		assert.NoError(t, err)
 
 		assert.Equal(t, want, got)
@@ -160,7 +160,7 @@ func TestGatewayName(t *testing.T) {
 		nodeClient := client.NewNodeClient(nodeID, rmbClient, 10)
 		cl.EXPECT().GetNodeClient(nodeID).Return(nodeClient, nil)
 
-		got, err := r.gatewayNameGet(context.Background(), projectName)
+		got, err := r.GatewayNameGet(context.Background(), projectName)
 		assert.NoError(t, err)
 
 		assert.Equal(t, want, got)

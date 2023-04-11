@@ -1,20 +1,20 @@
-package router
+package client
 
 import (
 	"testing"
 )
 
-func TestK8s(t *testing.T) {
+func TestMadchines(t *testing.T) {
 	// ctrl := gomock.NewController(t)
 	// defer ctrl.Finish()
 
 	// cl := mocks.NewMockTFGridClient(ctrl)
 
-	// r := Router{
+	// r := CLIClient{
 	// 	client: cl,
 	// }
 
-	// t.Run("k8s_deploy_success", func(t *testing.T) {
+	// t.Run("machines_deploy_success", func(t *testing.T) {
 
 	// })
 }

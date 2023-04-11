@@ -5,28 +5,19 @@ import (
 	"encoding/json"
 
 	"github.com/pkg/errors"
-	"github.com/threefoldtech/grid3-go/deployer"
+	client "github.com/threefoldtech/tf-grid-cli/pkg/server/cli_client"
 )
 
-type Credentials struct {
-	Mnemonics string `json:"mnemonics"`
-	Network   string `json:"network"`
-}
-
 func (r *Router) Login(ctx context.Context, data string) (interface{}, error) {
-	cred := Credentials{}
+	cred := client.Credentials{}
 
 	if err := json.Unmarshal([]byte(data), &cred); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal credentials data")
 	}
 
-	// TODO: if server already has an initialized client, close old client
-
-	newClient, err := deployer.NewTFPluginClient(cred.Mnemonics, "sr25519", cred.Network, "", "", "", 10, true, false)
-	if err != nil {
-		return deployer.TFPluginClient{}, errors.Wrap(err, "failed to get tf plugin client")
+	if err := r.client.Login(ctx, cred); err != nil {
+		return nil, errors.Wrap(err, "failed to login")
 	}
 
-	r.client = NewTFGridClient(&newClient)
 	return nil, nil
 }

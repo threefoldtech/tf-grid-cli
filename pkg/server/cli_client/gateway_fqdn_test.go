@@ -1,4 +1,4 @@
-package router
+package client
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/threefoldtech/grid3-go/graphql"
 	client "github.com/threefoldtech/grid3-go/node"
 	"github.com/threefoldtech/grid3-go/workloads"
-	"github.com/threefoldtech/tf-grid-cli/pkg/server/router/mocks"
+	"github.com/threefoldtech/tf-grid-cli/pkg/server/cli_client/mocks"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
@@ -20,7 +20,7 @@ func TestGatewayFQDN(t *testing.T) {
 
 	cl := mocks.NewMockTFGridClient(ctrl)
 
-	r := Router{
+	r := CLIClient{
 		client: cl,
 	}
 
@@ -78,7 +78,7 @@ func TestGatewayFQDN(t *testing.T) {
 			Description:    want.Description,
 		}
 
-		got, err := r.gatewayFQDNDeploy(context.Background(), model, projectName)
+		got, err := r.GatewayFQDNDeploy(context.Background(), model, projectName)
 		assert.NoError(t, err)
 
 		assert.Equal(t, want, got, "target gateway fqdn is not equal to result gateway fqdn")
@@ -106,7 +106,7 @@ func TestGatewayFQDN(t *testing.T) {
 			},
 		}, nil)
 
-		_, err := r.gatewayFQDNDeploy(context.Background(), fqdnModel, projectName)
+		_, err := r.GatewayFQDNDeploy(context.Background(), fqdnModel, projectName)
 		assert.Error(t, err)
 	})
 
@@ -163,7 +163,7 @@ func TestGatewayFQDN(t *testing.T) {
 		nodeClient := client.NewNodeClient(nodeID, rmbClient, 10)
 		cl.EXPECT().GetNodeClient(nodeID).Return(nodeClient, nil)
 
-		got, err := r.gatewayFQDNGet(context.Background(), projectName)
+		got, err := r.GatewayFQDNGet(context.Background(), projectName)
 		assert.NoError(t, err)
 
 		assert.Equal(t, want, got)
