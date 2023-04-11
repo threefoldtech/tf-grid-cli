@@ -12,7 +12,7 @@ import (
 	"github.com/threefoldtech/grid3-go/graphql"
 	client "github.com/threefoldtech/grid3-go/node"
 	"github.com/threefoldtech/grid3-go/workloads"
-	"github.com/threefoldtech/tf-grid-cli/pkg/server/router/mocks"
+	"github.com/threefoldtech/tf-grid-cli/pkg/server/cli_client/mocks"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
 )
@@ -23,7 +23,7 @@ func TestK8s(t *testing.T) {
 
 	cl := mocks.NewMockTFGridClient(ctrl)
 
-	r := Router{
+	r := CLIClient{
 		client: cl,
 	}
 
@@ -159,7 +159,7 @@ func TestK8s(t *testing.T) {
 
 		cl.EXPECT().DeployK8sCluster(gomock.Any(), &k8s).Return(&retK8s, nil)
 
-		got, err := r.k8sDeploy(context.Background(), model, projectName)
+		got, err := r.K8sDeploy(context.Background(), model, projectName)
 		assert.NoError(t, err)
 
 		assert.Equal(t, want, got)
@@ -274,7 +274,7 @@ func TestK8s(t *testing.T) {
 				return nil
 			})
 
-		got, err := r.k8sGet(context.Background(), clusterName, projectName)
+		got, err := r.K8sGet(context.Background(), clusterName, projectName)
 		assert.NoError(t, err)
 
 		assert.Equal(t, want, got)

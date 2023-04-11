@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
+	"github.com/threefoldtech/grid3-go/graphql"
 	"github.com/threefoldtech/grid3-go/workloads"
 	"github.com/threefoldtech/zos/pkg/gridtypes"
 	"github.com/threefoldtech/zos/pkg/gridtypes/zos"
@@ -47,7 +48,7 @@ func (r *CLIClient) K8sDeploy(ctx context.Context, cluster K8sCluster, projectNa
 	}
 
 	// deploy network
-	cluster.NetworkName = fmt.Sprintf("%s_network", cluster.Name)
+	cluster.NetworkName = generateNetworkName(cluster.Name)
 
 	nodeList := []uint32{}
 	nodeSet := map[uint32]struct{}{}
@@ -81,20 +82,7 @@ func (r *CLIClient) K8sDeploy(ctx context.Context, cluster K8sCluster, projectNa
 	}
 
 	// map to workloads.k8sCluster
-	var master workloads.K8sNode = NewClientK8sNodeFromK8sNode(*cluster.Master)
-	workers := []workloads.K8sNode{}
-	for _, worker := range cluster.Workers {
-		workers = append(workers, NewClientK8sNodeFromK8sNode(worker))
-	}
-
-	k8s := workloads.K8sCluster{
-		SolutionType: projectName,
-		NetworkName:  cluster.NetworkName,
-		Token:        cluster.Token,
-		SSHKey:       cluster.SSHKey,
-		Master:       &master,
-		Workers:      workers,
-	}
+	k8s := newK8sClusterFromModel(cluster, projectName)
 
 	// Deploy workload
 	resK8s, err := r.client.DeployK8sCluster(ctx, &k8s)
@@ -130,10 +118,34 @@ func (r *CLIClient) K8sGet(ctx context.Context, clusterName string, projectName 
 		return K8sCluster{}, fmt.Errorf("found 0 contracts for project %s", projectName)
 	}
 
+	cluster, err := r.reconstructClusterFromContractIDs(ctx, clusterName, contracts)
+	if err != nil {
+		return K8sCluster{}, err
+	}
+
+	return cluster, nil
+}
+
+func NewClientK8sNodeFromK8sNode(k8sNode K8sNode) workloads.K8sNode {
+	return workloads.K8sNode{
+		Name:      k8sNode.Name,
+		Node:      k8sNode.NodeID,
+		DiskSize:  k8sNode.DiskSize,
+		PublicIP:  k8sNode.PublicIP,
+		PublicIP6: k8sNode.PublicIP6,
+		Planetary: k8sNode.Planetary,
+		Flist:     k8sNode.Flist,
+		CPU:       k8sNode.CPU,
+		Memory:    k8sNode.Memory,
+	}
+}
+
+func (r *CLIClient) reconstructClusterFromContractIDs(ctx context.Context, clusterName string, contracts graphql.Contracts) (K8sCluster, error) {
 	result := K8sCluster{
-		Name:    clusterName,
-		Master:  &K8sNode{},
-		Workers: []K8sNode{},
+		Name:        clusterName,
+		Master:      &K8sNode{},
+		Workers:     []K8sNode{},
+		NetworkName: generateNetworkName(clusterName),
 	}
 
 	diskNameNodeNameMap := map[string]string{}
@@ -203,20 +215,6 @@ func (r *CLIClient) K8sGet(ctx context.Context, clusterName string, projectName 
 	return result, nil
 }
 
-func NewClientK8sNodeFromK8sNode(k8sNode K8sNode) workloads.K8sNode {
-	return workloads.K8sNode{
-		Name:      k8sNode.Name,
-		Node:      k8sNode.NodeID,
-		DiskSize:  k8sNode.DiskSize,
-		PublicIP:  k8sNode.PublicIP,
-		PublicIP6: k8sNode.PublicIP6,
-		Planetary: k8sNode.Planetary,
-		Flist:     k8sNode.Flist,
-		CPU:       k8sNode.CPU,
-		Memory:    k8sNode.Memory,
-	}
-}
-
 func NewK8sNodeFromVM(vm workloads.VM) K8sNode {
 	return K8sNode{
 		Name:      vm.Name,
@@ -237,10 +235,45 @@ func NewK8sNodeFromVM(vm workloads.VM) K8sNode {
 func (k *K8sNode) assignComputedNodeValues(node workloads.K8sNode) {
 	k.ComputedIP4 = node.ComputedIP
 	k.ComputedIP6 = node.ComputedIP6
-	k.WGIP = node.YggIP
-	k.YggIP = node.IP
+	k.WGIP = node.IP
+	k.YggIP = node.YggIP
 }
 
 func isWorker(vm workloads.VM) bool {
 	return len(vm.EnvVars["K3S_URL"]) != 0
+}
+
+func newK8sClusterFromModel(model K8sCluster, projectName string) workloads.K8sCluster {
+	master := newK8sNodeFromModel(*model.Master)
+	workers := []workloads.K8sNode{}
+	for _, w := range model.Workers {
+		workers = append(workers, newK8sNodeFromModel(w))
+	}
+
+	return workloads.K8sCluster{
+		Master:       &master,
+		Workers:      workers,
+		Token:        model.Token,
+		NetworkName:  model.NetworkName,
+		SolutionType: projectName,
+		SSHKey:       model.SSHKey,
+	}
+}
+
+func newK8sNodeFromModel(model K8sNode) workloads.K8sNode {
+	return workloads.K8sNode{
+		Name:        model.Name,
+		Node:        model.NodeID,
+		DiskSize:    model.DiskSize,
+		PublicIP:    model.PublicIP,
+		PublicIP6:   model.PublicIP6,
+		Planetary:   model.Planetary,
+		Flist:       model.Flist,
+		ComputedIP:  model.ComputedIP4,
+		ComputedIP6: model.ComputedIP6,
+		YggIP:       model.YggIP,
+		IP:          model.WGIP,
+		CPU:         model.CPU,
+		Memory:      model.Memory,
+	}
 }
