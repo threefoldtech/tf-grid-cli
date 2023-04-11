@@ -4,7 +4,7 @@ package cmd
 import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	command "github.com/threefoldtech/tf-grid-cli/internal/cmd"
+	command "github.com/threefoldtech/tf-grid-cli/pkg/cmd"
 )
 
 // loginCmd represents the login command
@@ -17,8 +17,4 @@ var loginCmd = &cobra.Command{
 			log.Fatal().Err(err).Send()
 		}
 	},
-}
-
-func init() {
-	rootCmd.AddCommand(loginCmd)
 }

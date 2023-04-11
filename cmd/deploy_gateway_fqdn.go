@@ -6,8 +6,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/threefoldtech/grid3-go/deployer"
 	"github.com/threefoldtech/grid3-go/workloads"
-	"github.com/threefoldtech/tf-grid-cli/internal/config"
-	"github.com/threefoldtech/tf-grid-cli/internal/filters"
+	"github.com/threefoldtech/tf-grid-cli/pkg/config"
+	"github.com/threefoldtech/tf-grid-cli/pkg/filters"
 )
 
 // deployGatewayFQDNCmd represents the deploy gateway fqdn command
@@ -34,7 +34,7 @@ var deployGatewayFQDNCmd = &cobra.Command{
 		if err != nil {
 			log.Fatal().Err(err).Send()
 		}
-		t, err := deployer.NewTFPluginClient(cfg.Mnemonics, "sr25519", cfg.Network, "", "", "", true, false)
+		t, err := deployer.NewTFPluginClient(cfg.Mnemonics, "sr25519", cfg.Network, "", "", "", 10, true, false)
 		if err != nil {
 			log.Fatal().Err(err).Send()
 		}
