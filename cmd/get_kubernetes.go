@@ -11,10 +11,10 @@ import (
 	"github.com/threefoldtech/tf-grid-cli/internal/config"
 )
 
-// getVMCmd represents the get vm command
-var getVMCmd = &cobra.Command{
-	Use:   "vm",
-	Short: "Get deployed vm",
+// getKubernetesCmd represents the get kubernetes command
+var getKubernetesCmd = &cobra.Command{
+	Use:   "kubernetes",
+	Short: "Get deployed kubernetes",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg, err := config.GetUserConfig()
@@ -26,19 +26,19 @@ var getVMCmd = &cobra.Command{
 			log.Fatal().Err(err).Send()
 		}
 
-		vm, err := command.GetVM(t, args[0])
+		cluster, err := command.GetK8sCluster(t, args[0])
 		if err != nil {
 			log.Fatal().Err(err).Send()
 		}
-		s, err := json.MarshalIndent(vm, "", "\t")
+		s, err := json.MarshalIndent(cluster, "", "\t")
 		if err != nil {
 			log.Fatal().Err(err).Send()
 		}
-		log.Info().Msg("vm:\n" + string(s))
+		log.Info().Msg("k8s cluster:\n" + string(s))
 
 	},
 }
 
 func init() {
-	getCmd.AddCommand(getVMCmd)
+	getCmd.AddCommand(getKubernetesCmd)
 }
